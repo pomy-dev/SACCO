@@ -188,7 +188,6 @@ function App() {
 
   const [requirementsInput, setRequirementsInput] = useState('')
   const [eligibilityInput, setEligibilityInput] = useState('')
-  // NEW list inputs
   const [applicationStepsInput, setApplicationStepsInput] = useState('')
   const [coverageDetailsInput, setCoverageDetailsInput] = useState('')
 
@@ -480,6 +479,8 @@ function App() {
     setSubmittedAt(ts)
     setDraft((d) => ({ ...(d || {}), submittedAt: ts, updatedAt: ts }))
     setView('submitted')
+
+    // console.log('Data: ', draft)
   }
 
   const headerCompany = draft?.company?.companyName || session?.companyName || 'SACCO Company'
@@ -1079,14 +1080,18 @@ function App() {
                         >
                           Add
                         </button>
-                        <button
-                          className="btn small ghost"
-                          type="button"
-                          onClick={() => setProductDraft((p) => ({ ...p, requirements: [] }))}
-                          disabled={normalizeList(productDraft.requirements).length === 0}
-                        >
-                          Clear all
-                        </button>
+                        {
+                          normalizeList(productDraft.requirements).length > 0 && (
+                            <button
+                              className="btn small ghost"
+                              type="button"
+                              onClick={() => setProductDraft((p) => ({ ...p, requirements: [] }))}
+                              disabled={normalizeList(productDraft.requirements).length === 0}
+                            >
+                              Clear all
+                            </button>
+                          )
+                        }
                       </div>
                       {normalizeList(productDraft.requirements).length ? (
                         <div className="listItems">
@@ -1140,14 +1145,18 @@ function App() {
                         >
                           Add
                         </button>
-                        <button
-                          className="btn small ghost"
-                          type="button"
-                          onClick={() => setProductDraft((p) => ({ ...p, eligibility: [] }))}
-                          disabled={normalizeList(productDraft.eligibility).length === 0}
-                        >
-                          Clear all
-                        </button>
+                        {
+                          normalizeList(productDraft.eligibility).length > 0 && (
+                            <button
+                              className="btn small ghost"
+                              type="button"
+                              onClick={() => setProductDraft((p) => ({ ...p, eligibility: [] }))}
+                              disabled={normalizeList(productDraft.eligibility).length === 0}
+                            >
+                              Clear all
+                            </button>
+                          )
+                        }
                       </div>
                       {normalizeList(productDraft.eligibility).length ? (
                         <div className="listItems">
@@ -1214,14 +1223,18 @@ function App() {
                         >
                           Add
                         </button>
-                        <button
-                          className="btn small ghost"
-                          type="button"
-                          onClick={() => setProductDraft((p) => ({ ...p, applicationSteps: [] }))}
-                          disabled={normalizeList(productDraft.applicationSteps).length === 0}
-                        >
-                          Clear all
-                        </button>
+                        {
+                          normalizeList(productDraft.applicationSteps).length > 0 && (
+                            <button
+                              className="btn small ghost"
+                              type="button"
+                              onClick={() => setProductDraft((p) => ({ ...p, applicationSteps: [] }))}
+                              disabled={normalizeList(productDraft.applicationSteps).length === 0}
+                            >
+                              Clear all
+                            </button>
+                          )
+                        }
                       </div>
                       {normalizeList(productDraft.applicationSteps).length ? (
                         <div className="listItems">
@@ -1497,6 +1510,7 @@ function App() {
                             <span className="label">Minimum investment</span>
                             <input
                               value={productDraft.minInvestment}
+                              type='number'
                               onChange={(e) => setProductDraft((p) => ({ ...p, minInvestment: e.target.value }))}
                               placeholder="e.g. 5000"
                               inputMode="decimal"
@@ -1506,6 +1520,7 @@ function App() {
                             <span className="label">Expected returns (% p.a.)</span>
                             <input
                               value={productDraft.expectedReturns}
+                              type='number'
                               onChange={(e) => setProductDraft((p) => ({ ...p, expectedReturns: e.target.value }))}
                               placeholder="e.g. 12"
                               inputMode="decimal"
