@@ -1,13 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
+import CompanyLogo from './assets/Img/logo.jpg'
 
 const STORAGE_KEYS = {
   theme: 'sacco_portal_theme',
   session: 'sacco_portal_session_v1',
   draft: 'sacco_portal_draft_v1',
 }
-
-const INDABUKO_LOGO_SRC = './assets/Img/logo.png'
 
 function safeJsonParse(value, fallback) {
   try {
@@ -423,7 +422,7 @@ function App() {
             aria-label="Toggle dark mode"
             title="Toggle dark mode"
           >
-            {theme === 'dark' ? 'Dark' : 'Light'} mode
+            {theme === 'dark' ? 'Dark 🌙' : 'Light 🔆'}
           </button>
 
           <button className="btn ghost" type="button" onClick={resetPortal}>
@@ -642,7 +641,7 @@ function App() {
                     }
                   />
                   <div className="hint">
-                    Required. Upload a signed consent document (PDF or image).
+                    Required. Upload a signed consent document (PDF).
                   </div>
                 </label>
 
@@ -756,7 +755,7 @@ function App() {
                     type="button"
                     onClick={() => setView('edit')}
                   >
-                    Create / edit
+                    Create / Edit
                   </button>
                   <button
                     className={view === 'review' ? 'tab active' : 'tab'}
@@ -993,7 +992,6 @@ function App() {
                       )}
                     </div>
 
-                    {/* <div className="grid two"> */}
                     <div className="field">
                       <span className="label">Eligibility</span>
                       <div className="listBuilderRow">
@@ -1054,7 +1052,6 @@ function App() {
                         </div>
                       )}
                     </div>
-                    {/* </div> */}
                     <div className="field">
                       <span className="label">Fees & charges</span>
                       <textarea
@@ -1175,8 +1172,8 @@ function App() {
                     <div className="notice">
                       <div className="noticeTitle">Final review</div>
                       <div className="noticeText">
-                        Confirm your company details and products. Once submitted, the data is stored
-                        locally (demo). In production, this would be sent to the platform backend.
+                        Confirm your company details and products. Once submitted, the data is synched
+                        with online server. You can visit the Business Link app to check you data, after 48 hrs.
                       </div>
                     </div>
 
@@ -1225,7 +1222,7 @@ function App() {
 
                     {submittedAt ? (
                       <div className="notice success">
-                        <div className="noticeTitle">Submitted (demo)</div>
+                        <div className="noticeTitle">Submitted</div>
                         <div className="noticeText">
                           Your products were submitted successfully at{' '}
                           <strong>{new Date(submittedAt).toLocaleString()}</strong>. You can still
@@ -1247,8 +1244,8 @@ function App() {
             <div className="footerLogo" aria-hidden="true">
               {indabukoLogoOk ? (
                 <img
-                  src={INDABUKO_LOGO_SRC}
-                  alt=""
+                  src={CompanyLogo}
+                  alt="Indabuko"
                   onError={() => setIndabukoLogoOk(false)}
                 />
               ) : (
