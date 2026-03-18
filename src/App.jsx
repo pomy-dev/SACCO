@@ -145,6 +145,14 @@ function App() {
     logoDataUrl: draft?.company?.logoDataUrl || '',
     consentFileName: draft?.company?.consentFileName || '',
     certificateFileName: draft?.company?.certificateFileName || '',
+    supportEmail: draft?.company?.supportEmail || '',
+    companyPhone: draft?.company?.companyPhone || '',
+    whatsapp: draft?.company?.whatsapp || '',
+    twitter: draft?.company?.twitter || '',
+    facebook: draft?.company?.facebook || '',
+    instagram: draft?.company?.instagram || '',
+    website: draft?.company?.website || '',
+    operationalHours: draft?.company?.operationalHours || '',
   }))
 
   const [indabukoLogoOk, setIndabukoLogoOk] = useState(true)
@@ -164,13 +172,29 @@ function App() {
     minAmount: '',
     maxAmount: '',
     collateral: '',
+    processingTime: '',
+    applicationSteps: [],
+    monthlyPremium: '',
+    coverageAmount: '',
+    policyType: 'Life',
+    coverageDetails: [],
+    minInvestment: '',
+    expectedReturns: '',
+    riskLevel: 'Medium',
+    investmentStrategy: '',
+    minBalance: '',
+    compoundingFrequency: 'Monthly',
   }))
+
   const [requirementsInput, setRequirementsInput] = useState('')
   const [eligibilityInput, setEligibilityInput] = useState('')
+  // NEW list inputs
+  const [applicationStepsInput, setApplicationStepsInput] = useState('')
+  const [coverageDetailsInput, setCoverageDetailsInput] = useState('')
 
   const products = draft?.products ?? []
   const [editingId, setEditingId] = useState(null)
-  const [view, setView] = useState('edit') // 'edit' | 'review' | 'submitted'
+  const [view, setView] = useState('edit')
   const [submittedAt, setSubmittedAt] = useState(() => draft?.submittedAt || null)
 
   useEffect(() => {
@@ -210,8 +234,6 @@ function App() {
     }
     persistCompanyDraft(nextCompany)
 
-    // Demo behavior: in real life, send via backend.
-    // Keeping it out of the UI while still enabling local testing.
     console.info('[SACCO Portal] OTP (demo):', otp, '→', email)
   }
 
@@ -263,6 +285,14 @@ function App() {
       logoDataUrl: verifyForm.logoDataUrl,
       consentFileName: verifyForm.consentFileName,
       certificateFileName: verifyForm.certificateFileName,
+      supportEmail: verifyForm.supportEmail.trim(),
+      companyPhone: verifyForm.companyPhone.trim(),
+      whatsapp: verifyForm.whatsapp.trim(),
+      twitter: verifyForm.twitter.trim(),
+      facebook: verifyForm.facebook.trim(),
+      instagram: verifyForm.instagram.trim(),
+      website: verifyForm.website.trim(),
+      operationalHours: verifyForm.operationalHours.trim(),
     }
     persistCompanyDraft(nextCompany)
     setSession((s) => (s ? { ...s, companyName: name, companyEmail: verifyForm.email.trim() } : s))
@@ -282,6 +312,7 @@ function App() {
     setStep('email')
   }
 
+  // ==================== UPSERT WITH ALL NEW FIELDS ====================
   function upsertProduct() {
     const name = productDraft.name.trim()
     if (!name) return
@@ -318,6 +349,34 @@ function App() {
       maxAmount:
         productDraft.maxAmount === '' ? '' : clampNumber(Number(productDraft.maxAmount), { min: 0 }),
       collateral: productDraft.collateral.trim(),
+      // NEW fields
+      processingTime: productDraft.processingTime.trim(),
+      applicationSteps: normalizeList(productDraft.applicationSteps),
+      monthlyPremium:
+        productDraft.monthlyPremium === ''
+          ? ''
+          : clampNumber(Number(productDraft.monthlyPremium), { min: 0 }),
+      coverageAmount:
+        productDraft.coverageAmount === ''
+          ? ''
+          : clampNumber(Number(productDraft.coverageAmount), { min: 0 }),
+      policyType: productDraft.policyType,
+      coverageDetails: normalizeList(productDraft.coverageDetails),
+      minInvestment:
+        productDraft.minInvestment === ''
+          ? ''
+          : clampNumber(Number(productDraft.minInvestment), { min: 0 }),
+      expectedReturns:
+        productDraft.expectedReturns === ''
+          ? ''
+          : clampNumber(Number(productDraft.expectedReturns), { min: 0, max: 1000 }),
+      riskLevel: productDraft.riskLevel,
+      investmentStrategy: productDraft.investmentStrategy.trim(),
+      minBalance:
+        productDraft.minBalance === ''
+          ? ''
+          : clampNumber(Number(productDraft.minBalance), { min: 0 }),
+      compoundingFrequency: productDraft.compoundingFrequency,
       updatedAt: Date.now(),
     }
 
@@ -333,6 +392,7 @@ function App() {
     })
 
     setEditingId(null)
+    // FULL RESET INCLUDING NEW FIELDS
     setProductDraft({
       name: '',
       category: 'Savings',
@@ -348,9 +408,23 @@ function App() {
       minAmount: '',
       maxAmount: '',
       collateral: '',
+      processingTime: '',
+      applicationSteps: [],
+      monthlyPremium: '',
+      coverageAmount: '',
+      policyType: 'Life',
+      coverageDetails: [],
+      minInvestment: '',
+      expectedReturns: '',
+      riskLevel: 'Medium',
+      investmentStrategy: '',
+      minBalance: '',
+      compoundingFrequency: 'Monthly',
     })
     setRequirementsInput('')
     setEligibilityInput('')
+    setApplicationStepsInput('')
+    setCoverageDetailsInput('')
   }
 
   function editProduct(p) {
@@ -370,9 +444,24 @@ function App() {
       minAmount: p.minAmount === '' ? '' : String(p.minAmount ?? ''),
       maxAmount: p.maxAmount === '' ? '' : String(p.maxAmount ?? ''),
       collateral: p.collateral || '',
+      // NEW fields
+      processingTime: p.processingTime || '',
+      applicationSteps: normalizeList(p.applicationSteps),
+      monthlyPremium: p.monthlyPremium === '' ? '' : String(p.monthlyPremium ?? ''),
+      coverageAmount: p.coverageAmount === '' ? '' : String(p.coverageAmount ?? ''),
+      policyType: p.policyType || 'Life',
+      coverageDetails: normalizeList(p.coverageDetails),
+      minInvestment: p.minInvestment === '' ? '' : String(p.minInvestment ?? ''),
+      expectedReturns: p.expectedReturns === '' ? '' : String(p.expectedReturns ?? ''),
+      riskLevel: p.riskLevel || 'Medium',
+      investmentStrategy: p.investmentStrategy || '',
+      minBalance: p.minBalance === '' ? '' : String(p.minBalance ?? ''),
+      compoundingFrequency: p.compoundingFrequency || 'Monthly',
     })
     setRequirementsInput('')
     setEligibilityInput('')
+    setApplicationStepsInput('')
+    setCoverageDetailsInput('')
     setView('edit')
     setStep('products')
     window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -517,8 +606,8 @@ function App() {
             <div className="cardHeader">
               <h1>Company details</h1>
               <p>
-                Complete your company profile. These details help clients identify your SACCO and
-                learn about your products.
+                Complete your company profile. These details help clients identify your SACCO, contact you,
+                and learn about your products and operating hours.
               </p>
             </div>
 
@@ -538,7 +627,7 @@ function App() {
                 </label>
 
                 <label className="field">
-                  <span className="label">Company name</span>
+                  <span className="label">Company name <span className="required">*</span></span>
                   <input
                     value={verifyForm.companyName}
                     onChange={(e) =>
@@ -546,50 +635,164 @@ function App() {
                     }
                     placeholder="e.g. Swazi Teachers SACCO"
                     autoComplete="organization"
+                    required
+                  />
+                </label>
+              </div>
+
+              {/* New social & contact fields */}
+              <div className="grid two">
+                <label className="field">
+                  <span className="label">Support email</span>
+                  <input
+                    type="email"
+                    value={verifyForm.supportEmail || ''}
+                    onChange={(e) =>
+                      setVerifyForm((v) => ({ ...v, supportEmail: e.target.value.trim() }))
+                    }
+                    placeholder="e.g. support@sacco.co.sz"
+                  />
+                  <div className="hint">For customer inquiries (optional but recommended)</div>
+                </label>
+
+                <label className="field">
+                  <span className="label">Company phone</span>
+                  <input
+                    type="tel"
+                    value={verifyForm.companyPhone || ''}
+                    onChange={(e) =>
+                      setVerifyForm((v) => ({ ...v, companyPhone: e.target.value.trim() }))
+                    }
+                    placeholder="e.g. +268 2400 1234"
+                  />
+                </label>
+              </div>
+
+              <div className="grid three">
+                <label className="field">
+                  <span className="label">WhatsApp number</span>
+                  <input
+                    type="tel"
+                    value={verifyForm.whatsapp || ''}
+                    onChange={(e) =>
+                      setVerifyForm((v) => ({ ...v, whatsapp: e.target.value.trim() }))
+                    }
+                    placeholder="e.g. +268 7600 5678"
+                  />
+                  <div className="hint">For quick support</div>
+                </label>
+
+                <label className="field">
+                  <span className="label">Website</span>
+                  <input
+                    type="url"
+                    value={verifyForm.website || ''}
+                    onChange={(e) =>
+                      setVerifyForm((v) => ({ ...v, website: e.target.value.trim() }))
+                    }
+                    placeholder="https://www.sacco.co.sz"
+                  />
+                </label>
+
+                <label className="field">
+                  <span className="label">Twitter / X handle</span>
+                  <input
+                    value={verifyForm.twitter || ''}
+                    onChange={(e) =>
+                      setVerifyForm((v) => ({ ...v, twitter: e.target.value.trim() }))
+                    }
+                    placeholder="@YourSacco"
                   />
                 </label>
               </div>
 
               <div className="grid two">
                 <label className="field">
-                  <span className="label">Company logo (optional)</span>
+                  <span className="label">Facebook page</span>
+                  <input
+                    type="url"
+                    value={verifyForm.facebook || ''}
+                    onChange={(e) =>
+                      setVerifyForm((v) => ({ ...v, facebook: e.target.value.trim() }))
+                    }
+                    placeholder="https://facebook.com/YourSacco"
+                  />
+                </label>
+
+                <label className="field">
+                  <span className="label">Instagram handle</span>
+                  <input
+                    value={verifyForm.instagram || ''}
+                    onChange={(e) =>
+                      setVerifyForm((v) => ({ ...v, instagram: e.target.value.trim() }))
+                    }
+                    placeholder="@your_sacco"
+                  />
+                </label>
+              </div>
+
+              {/* Documents + Logo in one row (3-column grid) */}
+              <div className="grid three">
+                <label className="field">
+                  <span className="label">Company logo <span className="required">*</span></span>
                   <input
                     type="file"
                     accept="image/*"
                     onChange={(e) => onPickLogo(e.target.files?.[0] || null)}
+                    required
                   />
                   {verifyForm.logoDataUrl ? (
                     <div className="logoPreview">
                       <img src={verifyForm.logoDataUrl} alt="Company logo preview" />
+                      <div className="hint success">Logo uploaded</div>
                     </div>
                   ) : (
-                    <div className="hint">Used for branding and identification.</div>
+                    <div className="hint danger">Required (PNG/JPG).</div>
                   )}
                 </label>
 
                 <label className="field">
-                  <span className="label">Portal theme color</span>
-                  <div className="colorRow">
-                    <input
-                      type="color"
-                      value={verifyForm.themeColor}
-                      onChange={(e) =>
-                        setVerifyForm((v) => ({ ...v, themeColor: e.target.value }))
-                      }
-                      aria-label="Theme color picker"
-                    />
-                    <input
-                      value={verifyForm.themeColor}
-                      onChange={(e) =>
-                        setVerifyForm((v) => ({ ...v, themeColor: e.target.value }))
-                      }
-                      spellCheck={false}
-                    />
+                  <span className="label">Signed consent document <span className="required">*</span></span>
+                  <input
+                    type="file"
+                    accept=".pdf,.png,.jpg,.jpeg"
+                    onChange={(e) =>
+                      setVerifyForm((v) => ({
+                        ...v,
+                        consentFileName: e.target.files?.[0]?.name || '',
+                      }))
+                    }
+                    required
+                  />
+                  <div className="hint">
+                    {verifyForm.consentFileName
+                      ? `Uploaded: ${verifyForm.consentFileName}`
+                      : 'Required (PDF).'}
                   </div>
-                  <div className="hint">This color brands the portal for your company.</div>
+                </label>
+
+                <label className="field">
+                  <span className="label">Company verification <span className="required">*</span></span>
+                  <input
+                    type="file"
+                    accept=".pdf,.png,.jpg,.jpeg"
+                    onChange={(e) =>
+                      setVerifyForm((v) => ({
+                        ...v,
+                        certificateFileName: e.target.files?.[0]?.name || '',
+                      }))
+                    }
+                    required
+                  />
+                  <div className="hint">
+                    {verifyForm.certificateFileName
+                      ? `Uploaded: ${verifyForm.certificateFileName}`
+                      : 'Required (PDF)'}
+                  </div>
                 </label>
               </div>
 
+              {/* Existing optional fields (directions, lat/long, theme color) */}
               <div className="grid two">
                 <label className="field">
                   <span className="label">Directions / address (optional)</span>
@@ -627,42 +830,55 @@ function App() {
                 </div>
               </div>
 
-              <div className="grid two">
+              <div className='grid two'>
                 <label className="field">
-                  <span className="label">Signed consent document</span>
-                  <input
-                    type="file"
-                    accept=".pdf,.png,.jpg,.jpeg"
-                    onChange={(e) =>
-                      setVerifyForm((v) => ({
-                        ...v,
-                        consentFileName: e.target.files?.[0]?.name || '',
-                      }))
-                    }
-                  />
-                  <div className="hint">
-                    Required. Upload a signed consent document (PDF).
+                  <span className="label">Portal theme color</span>
+                  <div className="colorRow">
+                    <input
+                      type="color"
+                      value={verifyForm.themeColor}
+                      onChange={(e) =>
+                        setVerifyForm((v) => ({ ...v, themeColor: e.target.value }))
+                      }
+                      aria-label="Theme color picker"
+                    />
+                    <input
+                      value={verifyForm.themeColor}
+                      onChange={(e) =>
+                        setVerifyForm((v) => ({ ...v, themeColor: e.target.value }))
+                      }
+                      spellCheck={false}
+                    />
                   </div>
+                  <div className="hint">This color brands the portal for your company (optional).</div>
                 </label>
 
                 <label className="field">
-                  <span className="label">Company verification certificate</span>
+                  <span className="label">Operational days & time</span>
                   <input
-                    type="file"
-                    accept=".pdf,.png,.jpg,.jpeg"
+                    value={verifyForm.operationalHours || ''}
                     onChange={(e) =>
-                      setVerifyForm((v) => ({
-                        ...v,
-                        certificateFileName: e.target.files?.[0]?.name || '',
-                      }))
+                      setVerifyForm((v) => ({ ...v, operationalHours: e.target.value }))
                     }
+                    placeholder="e.g. Monday–Friday: 08:00–16:30"
+                    rows={4}
                   />
-                  <div className="hint">Required. Upload a verification certificate.</div>
+                  <div className="hint">List your branch hours clearly</div>
                 </label>
               </div>
 
               <div className="actions">
-                <button className="btn primary" type="button" onClick={saveCompanyDetailsAndContinue}>
+                <button
+                  className="btn primary"
+                  type="button"
+                  onClick={saveCompanyDetailsAndContinue}
+                  disabled={
+                    !verifyForm.companyName.trim() ||
+                    !verifyForm.logoDataUrl ||
+                    !verifyForm.consentFileName ||
+                    !verifyForm.certificateFileName
+                  }
+                >
                   Continue to products
                 </button>
                 <button
@@ -781,39 +997,42 @@ function App() {
                         {editingId ? 'Editing product' : 'New product'}
                       </div>
                       <div className="noticeText">
-                        Fill the key details that customers need to learn about the product.
+                        Fill the key details. Fields change automatically when you toggle the category tabs above.
                       </div>
                     </div>
 
-                    <div className="grid two">
-                      <label className="field">
-                        <span className="label">Product name</span>
-                        <input
-                          value={productDraft.name}
-                          onChange={(e) =>
-                            setProductDraft((p) => ({ ...p, name: e.target.value }))
-                          }
-                          placeholder="e.g. Salary Advance Loan"
-                        />
-                      </label>
+                    {/* ==================== PRODUCT NAME ==================== */}
+                    <label className="field">
+                      <span className="label">Product name</span>
+                      <input
+                        value={productDraft.name}
+                        onChange={(e) =>
+                          setProductDraft((p) => ({ ...p, name: e.target.value }))
+                        }
+                        placeholder="e.g. Salary Advance Loan"
+                      />
+                    </label>
 
-                      <label className="field">
-                        <span className="label">Category</span>
-                        <select
-                          value={productDraft.category}
-                          onChange={(e) =>
-                            setProductDraft((p) => ({ ...p, category: e.target.value }))
-                          }
-                        >
-                          <option>Savings</option>
-                          <option>Loans</option>
-                          <option>Insurance</option>
-                          <option>Investments</option>
-                          <option>Other</option>
-                        </select>
-                      </label>
+                    {/* ==================== CATEGORY TABS (NEW) ==================== */}
+                    <div className="field">
+                      <span className="label">Category</span>
+                      <div className="tabs">
+                        {['Savings', 'Loans', 'Insurance', 'Investments'].map((cat) => (
+                          <button
+                            key={cat}
+                            type="button"
+                            className={`tab ${productDraft.category === cat ? 'active' : ''}`}
+                            onClick={() =>
+                              setProductDraft((p) => ({ ...p, category: cat }))
+                            }
+                          >
+                            {cat}
+                          </button>
+                        ))}
+                      </div>
                     </div>
 
+                    {/* ==================== COMMON FIELDS ==================== */}
                     <label className="field">
                       <span className="label">One-line summary</span>
                       <input
@@ -836,100 +1055,6 @@ function App() {
                         rows={4}
                       />
                     </label>
-
-                    <div className="grid three">
-                      <label className="field">
-                        <span className="label">Interest rate (APR %)</span>
-                        <input
-                          value={productDraft.interestRateApr}
-                          onChange={(e) =>
-                            setProductDraft((p) => ({ ...p, interestRateApr: e.target.value }))
-                          }
-                          placeholder="e.g. 18"
-                          inputMode="decimal"
-                        />
-                      </label>
-
-                      <label className="field">
-                        <span className="label">Min duration (months)</span>
-                        <input
-                          value={productDraft.minDurationMonths}
-                          onChange={(e) =>
-                            setProductDraft((p) => ({ ...p, minDurationMonths: e.target.value }))
-                          }
-                          placeholder="e.g. 1"
-                          inputMode="numeric"
-                        />
-                      </label>
-
-                      <label className="field">
-                        <span className="label">Max duration (months)</span>
-                        <input
-                          value={productDraft.maxDurationMonths}
-                          onChange={(e) =>
-                            setProductDraft((p) => ({ ...p, maxDurationMonths: e.target.value }))
-                          }
-                          placeholder="e.g. 36"
-                          inputMode="numeric"
-                        />
-                      </label>
-                    </div>
-
-                    <div className="grid two">
-                      <label className="field">
-                        <span className="label">Min amount (optional)</span>
-                        <input
-                          value={productDraft.minAmount}
-                          onChange={(e) =>
-                            setProductDraft((p) => ({ ...p, minAmount: e.target.value }))
-                          }
-                          placeholder="e.g. 500"
-                          inputMode="decimal"
-                        />
-                      </label>
-                      <label className="field">
-                        <span className="label">Max amount (optional)</span>
-                        <input
-                          value={productDraft.maxAmount}
-                          onChange={(e) =>
-                            setProductDraft((p) => ({ ...p, maxAmount: e.target.value }))
-                          }
-                          placeholder="e.g. 50000"
-                          inputMode="decimal"
-                        />
-                      </label>
-                    </div>
-
-                    <div className="grid two">
-                      <label className="field">
-                        <span className="label">Repayment frequency</span>
-                        <select
-                          value={productDraft.repaymentFrequency}
-                          onChange={(e) =>
-                            setProductDraft((p) => ({
-                              ...p,
-                              repaymentFrequency: e.target.value,
-                            }))
-                          }
-                        >
-                          <option>Weekly</option>
-                          <option>Bi-weekly</option>
-                          <option>Monthly</option>
-                          <option>Quarterly</option>
-                          <option>At maturity</option>
-                        </select>
-                      </label>
-                      <label className="field">
-                        <span className="label">Collateral / security (optional)</span>
-                        <input
-                          value={productDraft.collateral}
-                          onChange={(e) =>
-                            setProductDraft((p) => ({ ...p, collateral: e.target.value }))
-                          }
-                          placeholder="e.g. Payslip, guarantors, vehicle logbook"
-                        />
-                      </label>
-                    </div>
 
                     <div className="field">
                       <span className="label">Requirements</span>
@@ -1052,6 +1177,7 @@ function App() {
                         </div>
                       )}
                     </div>
+
                     <div className="field">
                       <span className="label">Fees & charges</span>
                       <textarea
@@ -1063,6 +1189,353 @@ function App() {
                         rows={3}
                       />
                     </div>
+
+                    {/* ==================== NEW COMMON: APPLICATION STEPS ==================== */}
+                    <div className="field">
+                      <span className="label">How to start / Application process steps</span>
+                      <div className="listBuilderRow">
+                        <input
+                          value={applicationStepsInput}
+                          onChange={(e) => setApplicationStepsInput(e.target.value)}
+                          placeholder="e.g. 1. Be a verified member"
+                        />
+                        <button
+                          className="btn small"
+                          type="button"
+                          onClick={() => {
+                            const next = applicationStepsInput.trim()
+                            if (!next) return
+                            setProductDraft((p) => ({
+                              ...p,
+                              applicationSteps: normalizeList([...(p.applicationSteps || []), next]),
+                            }))
+                            setApplicationStepsInput('')
+                          }}
+                        >
+                          Add
+                        </button>
+                        <button
+                          className="btn small ghost"
+                          type="button"
+                          onClick={() => setProductDraft((p) => ({ ...p, applicationSteps: [] }))}
+                          disabled={normalizeList(productDraft.applicationSteps).length === 0}
+                        >
+                          Clear all
+                        </button>
+                      </div>
+                      {normalizeList(productDraft.applicationSteps).length ? (
+                        <div className="listItems">
+                          {normalizeList(productDraft.applicationSteps).map((item) => (
+                            <div key={item} className="listItem">
+                              <span className="listText">{item}</span>
+                              <button
+                                className="btn small ghost"
+                                type="button"
+                                onClick={() =>
+                                  setProductDraft((p) => ({
+                                    ...p,
+                                    applicationSteps: normalizeList(p.applicationSteps).filter((x) => x !== item),
+                                  }))
+                                }
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="hint">
+                          {/* Number the steps (e.g. 1. Visit branch, 2. Submit documents...) */}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* ==================== CATEGORY-SPECIFIC SECTIONS ==================== */}
+                    <div className="notice">
+                      {/* <div className="noticeTitle">Category-specific details (changes with tabs)</div> */}
+                    </div>
+
+                    {/* LOANS */}
+                    {productDraft.category === 'Loans' && (
+                      <>
+                        <div className="grid three">
+                          <label className="field">
+                            <span className="label">Interest rate (APR %)</span>
+                            <input
+                              value={productDraft.interestRateApr}
+                              type='number'
+                              onChange={(e) => setProductDraft((p) => ({ ...p, interestRateApr: e.target.value }))}
+                              placeholder="e.g. 18"
+                              inputMode="decimal"
+                            />
+                          </label>
+                          <label className="field">
+                            <span className="label">Min duration (months)</span>
+                            <input
+                              value={productDraft.minDurationMonths}
+                              type='number'
+                              onChange={(e) => setProductDraft((p) => ({ ...p, minDurationMonths: e.target.value }))}
+                              placeholder="e.g. 1"
+                              inputMode="numeric"
+                            />
+                          </label>
+                          <label className="field">
+                            <span className="label">Max duration (months)</span>
+                            <input
+                              value={productDraft.maxDurationMonths}
+                              type='number'
+                              onChange={(e) => setProductDraft((p) => ({ ...p, maxDurationMonths: e.target.value }))}
+                              placeholder="e.g. 36"
+                              inputMode="numeric"
+                            />
+                          </label>
+                        </div>
+
+                        <div className="grid two">
+                          <label className="field">
+                            <span className="label">Min amount</span>
+                            <input
+                              value={productDraft.minAmount}
+                              type='number'
+                              onChange={(e) => setProductDraft((p) => ({ ...p, minAmount: e.target.value }))}
+                              placeholder="e.g. 500"
+                              inputMode="decimal"
+                            />
+                          </label>
+                          <label className="field">
+                            <span className="label">Max amount</span>
+                            <input
+                              value={productDraft.maxAmount}
+                              type='number'
+                              onChange={(e) => setProductDraft((p) => ({ ...p, maxAmount: e.target.value }))}
+                              placeholder="e.g. 50000"
+                              inputMode="decimal"
+                            />
+                          </label>
+                        </div>
+
+                        <div className="grid two">
+                          <label className="field">
+                            <span className="label">Repayment frequency</span>
+                            <select
+                              value={productDraft.repaymentFrequency}
+                              onChange={(e) => setProductDraft((p) => ({ ...p, repaymentFrequency: e.target.value }))}
+                            >
+                              <option>Weekly</option>
+                              <option>Bi-weekly</option>
+                              <option>Monthly</option>
+                              <option>Quarterly</option>
+                              <option>At maturity</option>
+                            </select>
+                          </label>
+                          <label className="field">
+                            <span className="label">Collateral / security</span>
+                            <input
+                              value={productDraft.collateral}
+                              type='text'
+                              onChange={(e) => setProductDraft((p) => ({ ...p, collateral: e.target.value }))}
+                              placeholder="e.g. Payslip, guarantors"
+                            />
+                          </label>
+                        </div>
+
+                        <label className="field">
+                          <span className="label">Processing time</span>
+                          <input
+                            value={productDraft.processingTime}
+                            type='text'
+                            onChange={(e) => setProductDraft((p) => ({ ...p, processingTime: e.target.value }))}
+                            placeholder="e.g. 3-5 business days"
+                          />
+                          <div className="hint">How long it takes to approve the loan.</div>
+                        </label>
+                      </>
+                    )}
+
+                    {/* SAVINGS */}
+                    {productDraft.category === 'Savings' && (
+                      <>
+                        <div className="grid two">
+                          <label className="field">
+                            <span className="label">Interest rate (APR %)</span>
+                            <input
+                              value={productDraft.interestRateApr}
+                              type='number'
+                              onChange={(e) => setProductDraft((p) => ({ ...p, interestRateApr: e.target.value }))}
+                              placeholder="e.g. 5.5"
+                              inputMode="decimal"
+                            />
+                          </label>
+                          <label className="field">
+                            <span className="label">Minimum balance</span>
+                            <input
+                              value={productDraft.minBalance}
+                              type='number'
+                              onChange={(e) => setProductDraft((p) => ({ ...p, minBalance: e.target.value }))}
+                              placeholder="e.g. 100"
+                              inputMode="decimal"
+                            />
+                          </label>
+                        </div>
+
+                        <label className="field">
+                          <span className="label">Compounding frequency</span>
+                          <select
+                            value={productDraft.compoundingFrequency}
+                            onChange={(e) => setProductDraft((p) => ({ ...p, compoundingFrequency: e.target.value }))}
+                          >
+                            <option>Daily</option>
+                            <option>Weekly</option>
+                            <option>Monthly</option>
+                            <option>Annually</option>
+                          </select>
+                        </label>
+                      </>
+                    )}
+
+                    {/* INSURANCE */}
+                    {productDraft.category === 'Insurance' && (
+                      <>
+                        <div className="grid two">
+                          <label className="field">
+                            <span className="label">Monthly premium</span>
+                            <input
+                              value={productDraft.monthlyPremium}
+                              type='number'
+                              onChange={(e) => setProductDraft((p) => ({ ...p, monthlyPremium: e.target.value }))}
+                              placeholder="e.g. 45"
+                              inputMode="decimal"
+                            />
+                          </label>
+                          <label className="field">
+                            <span className="label">Coverage amount</span>
+                            <input
+                              value={productDraft.coverageAmount}
+                              type='number'
+                              onChange={(e) => setProductDraft((p) => ({ ...p, coverageAmount: e.target.value }))}
+                              placeholder="e.g. 100000"
+                              inputMode="decimal"
+                            />
+                          </label>
+                        </div>
+
+                        <label className="field">
+                          <span className="label">Policy type</span>
+                          <input
+                            value={productDraft.policyType}
+                            type='text'
+                            placeholder="e.g. Business Cover"
+                            onChange={(e) => setProductDraft((p) => ({ ...p, policyType: e.target.value }))}
+                          />
+                        </label>
+
+                        {/* Coverage details list */}
+                        <div className="field">
+                          <span className="label">Coverage details</span>
+                          <div className="listBuilderRow">
+                            <input
+                              value={coverageDetailsInput}
+                              onChange={(e) => setCoverageDetailsInput(e.target.value)}
+                              placeholder="e.g. Hospital bills up to E50,000"
+                            />
+                            <button
+                              className="btn small"
+                              type="button"
+                              onClick={() => {
+                                const next = coverageDetailsInput.trim()
+                                if (!next) return
+                                setProductDraft((p) => ({
+                                  ...p,
+                                  coverageDetails: normalizeList([...(p.coverageDetails || []), next]),
+                                }))
+                                setCoverageDetailsInput('')
+                              }}
+                            >
+                              Add
+                            </button>
+                            <button
+                              className="btn small ghost"
+                              type="button"
+                              onClick={() => setProductDraft((p) => ({ ...p, coverageDetails: [] }))}
+                              disabled={normalizeList(productDraft.coverageDetails).length === 0}
+                            >
+                              Clear all
+                            </button>
+                          </div>
+                          {normalizeList(productDraft.coverageDetails).length ? (
+                            <div className="listItems">
+                              {normalizeList(productDraft.coverageDetails).map((item) => (
+                                <div key={item} className="listItem">
+                                  <span className="listText">{item}</span>
+                                  <button
+                                    className="btn small ghost"
+                                    type="button"
+                                    onClick={() =>
+                                      setProductDraft((p) => ({
+                                        ...p,
+                                        coverageDetails: normalizeList(p.coverageDetails).filter((x) => x !== item),
+                                      }))
+                                    }
+                                  >
+                                    ✕
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="hint">What is covered, limits, exclusions, etc.</div>
+                          )}
+                        </div>
+                      </>
+                    )}
+
+                    {/* INVESTMENTS */}
+                    {productDraft.category === 'Investments' && (
+                      <>
+                        <div className="grid two">
+                          <label className="field">
+                            <span className="label">Minimum investment</span>
+                            <input
+                              value={productDraft.minInvestment}
+                              onChange={(e) => setProductDraft((p) => ({ ...p, minInvestment: e.target.value }))}
+                              placeholder="e.g. 5000"
+                              inputMode="decimal"
+                            />
+                          </label>
+                          <label className="field">
+                            <span className="label">Expected returns (% p.a.)</span>
+                            <input
+                              value={productDraft.expectedReturns}
+                              onChange={(e) => setProductDraft((p) => ({ ...p, expectedReturns: e.target.value }))}
+                              placeholder="e.g. 12"
+                              inputMode="decimal"
+                            />
+                          </label>
+                        </div>
+
+                        <label className="field">
+                          <span className="label">Risk level</span>
+                          <select
+                            value={productDraft.riskLevel}
+                            onChange={(e) => setProductDraft((p) => ({ ...p, riskLevel: e.target.value }))}
+                          >
+                            <option>Low</option>
+                            <option>Medium</option>
+                            <option>High</option>
+                          </select>
+                        </label>
+
+                        <label className="field">
+                          <span className="label">Investment strategy</span>
+                          <textarea
+                            value={productDraft.investmentStrategy}
+                            onChange={(e) => setProductDraft((p) => ({ ...p, investmentStrategy: e.target.value }))}
+                            placeholder="Describe the strategy, asset allocation, etc."
+                            rows={3}
+                          />
+                        </label>
+                      </>
+                    )}
 
                     <div className="actions">
                       <button className="btn primary" type="button" onClick={upsertProduct}>
@@ -1225,8 +1698,8 @@ function App() {
                         <div className="noticeTitle">Submitted</div>
                         <div className="noticeText">
                           Your products were submitted successfully at{' '}
-                          <strong>{new Date(submittedAt).toLocaleString()}</strong>. You can still
-                          edit within your remaining session time.
+                          <strong>{new Date(submittedAt).toLocaleString()}</strong>. You can see your
+                          financial products from the <strong>Business Link</strong> app ➖ <strong>Smart Financing</strong>.
                         </div>
                       </div>
                     ) : null}
