@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import './App.css'
 import CompanyLogo from './assets/Img/logo.jpg'
 
+const MongoDBURL = 'http://10.150.51.51:5000'
+
 const STORAGE_KEYS = {
   theme: 'sacco_portal_theme',
   session: 'sacco_portal_session_v1',
@@ -101,20 +103,21 @@ function App() {
     return now >= session.expiresAt
   }, [now, session])
 
-  const hasCompanyDetails = useMemo(() => {
-    const c = draft?.company
-    if (!c) return false
-    return Boolean(
-      String(c.companyName || '').trim() &&
-      String(c.consentFileName || '').trim() &&
-      String(c.certificateFileName || '').trim(),
-    )
-  }, [draft?.company])
-
   const timeLeftMs = useMemo(() => {
     if (!session?.expiresAt) return null
     return Math.max(0, session.expiresAt - now)
   }, [now, session])
+
+  const hasCompanyDetails = useMemo(() => {
+    const c = draft?.company;
+    if (!c) return false;
+    return Boolean(
+      String(c.companyName || '').trim() &&
+      String(c.logoDataUrl || '').trim() &&
+      String(c.consentDataUrl || '').trim() &&
+      String(c.certificateDataUrl || '').trim()
+    );
+  }, [draft?.company]);
 
   const [step, setStep] = useState(() => {
     const cachedDraft = safeJsonParse(localStorage.getItem(STORAGE_KEYS.draft), null)
@@ -153,20 +156,21 @@ function App() {
     instagram: draft?.company?.instagram || '',
     website: draft?.company?.website || '',
     operationalHours: draft?.company?.operationalHours || '',
+    consentDataUrl: draft?.company?.consentDataUrl || '',
+    certificateDataUrl: draft?.company?.certificateDataUrl || '',
   }))
 
   const [indabukoLogoOk, setIndabukoLogoOk] = useState(true)
 
   const [productDraft, setProductDraft] = useState(() => ({
     name: '',
-    category: 'Savings',
     summary: '',
     description: '',
     interestRateApr: '',
     minDurationMonths: '',
     maxDurationMonths: '',
     requirements: [],
-    fees: '',
+    charges: '',
     eligibility: [],
     repaymentFrequency: 'Monthly',
     minAmount: '',
@@ -205,6 +209,26 @@ function App() {
     if (!file) return
     const dataUrl = await readFileAsDataUrl(file)
     setVerifyForm((v) => ({ ...v, logoDataUrl: dataUrl }))
+  }
+
+  async function onPickConsent(file) {
+    if (!file) return;
+    const dataUrl = await readFileAsDataUrl(file);
+    setVerifyForm((v) => ({
+      ...v,
+      consentDataUrl: dataUrl,
+      consentFileName: file.name,
+    }));
+  }
+
+  async function onPickCertificate(file) {
+    if (!file) return;
+    const dataUrl = await readFileAsDataUrl(file);
+    setVerifyForm((v) => ({
+      ...v,
+      certificateDataUrl: dataUrl,
+      certificateFileName: file.name,
+    }));
   }
 
   function persistCompanyDraft(nextCompany) {
@@ -259,29 +283,24 @@ function App() {
   }
 
   function saveCompanyDetailsAndContinue() {
-    setOtpError('')
-    const name = verifyForm.companyName.trim()
-    if (!name) return setOtpError('Company name is required.')
-    if (!verifyForm.consentFileName)
-      return setOtpError('Signed consent document is required.')
-    if (!verifyForm.certificateFileName)
-      return setOtpError('Company verification certificate is required.')
+    setOtpError('');
+    const name = verifyForm.companyName.trim();
+    if (!name) return setOtpError('Company name is required.');
+    if (!verifyForm.logoDataUrl) return setOtpError('Company logo is required.');
+    if (!verifyForm.consentDataUrl) return setOtpError('Signed consent document is required.');
+    if (!verifyForm.certificateDataUrl) return setOtpError('Company verification certificate is required.');
 
     const nextCompany = {
       ...(draft?.company || {}),
       companyName: name,
-      email: verifyForm.email.trim(),
+      email: verifyForm.email.trim().toLowerCase(),
       directionsText: verifyForm.directionsText.trim(),
-      latitude:
-        verifyForm.latitude === ''
-          ? ''
-          : clampNumber(Number(verifyForm.latitude), { min: -90, max: 90 }),
-      longitude:
-        verifyForm.longitude === ''
-          ? ''
-          : clampNumber(Number(verifyForm.longitude), { min: -180, max: 180 }),
+      latitude: verifyForm.latitude === '' ? '' : clampNumber(Number(verifyForm.latitude), { min: -90, max: 90 }),
+      longitude: verifyForm.longitude === '' ? '' : clampNumber(Number(verifyForm.longitude), { min: -180, max: 180 }),
       themeColor: verifyForm.themeColor,
       logoDataUrl: verifyForm.logoDataUrl,
+      consentDataUrl: verifyForm.consentDataUrl,
+      certificateDataUrl: verifyForm.certificateDataUrl,
       consentFileName: verifyForm.consentFileName,
       certificateFileName: verifyForm.certificateFileName,
       supportEmail: verifyForm.supportEmail.trim(),
@@ -292,10 +311,11 @@ function App() {
       instagram: verifyForm.instagram.trim(),
       website: verifyForm.website.trim(),
       operationalHours: verifyForm.operationalHours.trim(),
-    }
-    persistCompanyDraft(nextCompany)
-    setSession((s) => (s ? { ...s, companyName: name, companyEmail: verifyForm.email.trim() } : s))
-    setStep('products')
+    };
+
+    persistCompanyDraft(nextCompany);
+    setSession((s) => (s ? { ...s, companyName: name, companyEmail: verifyForm.email.trim() } : s));
+    setStep('products');
   }
 
   function resetPortal() {
@@ -340,7 +360,7 @@ function App() {
           ? ''
           : clampNumber(Number(productDraft.maxDurationMonths), { min: 0, max: 600 }),
       requirements: normalizeList(productDraft.requirements),
-      fees: productDraft.fees.trim(),
+      charges: productDraft.charges.trim(),
       eligibility: normalizeList(productDraft.eligibility),
       repaymentFrequency: productDraft.repaymentFrequency,
       minAmount:
@@ -401,7 +421,7 @@ function App() {
       minDurationMonths: '',
       maxDurationMonths: '',
       requirements: [],
-      fees: '',
+      charges: '',
       eligibility: [],
       repaymentFrequency: 'Monthly',
       minAmount: '',
@@ -437,7 +457,7 @@ function App() {
       minDurationMonths: p.minDurationMonths === '' ? '' : String(p.minDurationMonths ?? ''),
       maxDurationMonths: p.maxDurationMonths === '' ? '' : String(p.maxDurationMonths ?? ''),
       requirements: normalizeList(p.requirements),
-      fees: p.fees || '',
+      charges: p.charges || '',
       eligibility: normalizeList(p.eligibility),
       repaymentFrequency: p.repaymentFrequency || 'Monthly',
       minAmount: p.minAmount === '' ? '' : String(p.minAmount ?? ''),
@@ -474,13 +494,48 @@ function App() {
     if (editingId === id) setEditingId(null)
   }
 
-  function submitAll() {
-    const ts = Date.now()
-    setSubmittedAt(ts)
-    setDraft((d) => ({ ...(d || {}), submittedAt: ts, updatedAt: ts }))
-    setView('submitted')
+  async function submitAll() {
+    // const ts = Date.now()
+    // setSubmittedAt(ts)
+    // setDraft((d) => ({ ...(d || {}), submittedAt: ts, updatedAt: ts }))
+    // setView('submitted')
 
-    // console.log('Data: ', draft)
+    console.log('Data: ', draft)
+
+    try {
+      const payload = {
+        SaccoEntity: draft?.company || {},
+        SaccoEntityProducts: draft?.products || [],
+      };
+
+      const response = await fetch(`${MongoDBURL}/api/submit-sacco`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || 'Submission failed');
+      }
+
+      const result = await response.json();
+      console.log('✅ Submitted to MongoDB + Cloudinary:', result);
+
+      // === DESTROY LOCAL STORAGE ===
+      localStorage.removeItem(STORAGE_KEYS.draft);
+      // localStorage.removeItem(STORAGE_KEYS.session);
+
+      setDraft(null);
+      setSession(null);
+      setSubmittedAt(Date.now());
+      setView('submitted');
+
+      alert(`Success! ${result.message}\n\nYou can now view your products in the Business Link app.`);
+    } catch (err) {
+      console.error(err);
+      setOtpError(`Submission failed: ${err.message}`);
+    }
   }
 
   const headerCompany = draft?.company?.companyName || session?.companyName || 'SACCO Company'
@@ -745,7 +800,7 @@ function App() {
                   {verifyForm.logoDataUrl ? (
                     <div className="logoPreview">
                       <img src={verifyForm.logoDataUrl} alt="Company logo preview" />
-                      <div className="hint success">Logo uploaded</div>
+                      <div className="hint success">Logo ready</div>
                     </div>
                   ) : (
                     <div className="hint danger">Required (PNG/JPG).</div>
@@ -757,19 +812,14 @@ function App() {
                   <input
                     type="file"
                     accept=".pdf,.png,.jpg,.jpeg"
-                    onChange={(e) =>
-                      setVerifyForm((v) => ({
-                        ...v,
-                        consentFileName: e.target.files?.[0]?.name || '',
-                      }))
-                    }
+                    onChange={(e) => onPickConsent(e.target.files?.[0] || null)}
                     required
                   />
-                  <div className="hint">
-                    {verifyForm.consentFileName
-                      ? `Uploaded: ${verifyForm.consentFileName}`
-                      : 'Required (PDF).'}
-                  </div>
+                  {verifyForm.consentDataUrl ? (
+                    <div className="hint success">Consent ready ({verifyForm.consentFileName})</div>
+                  ) : (
+                    <div className="hint danger">Required</div>
+                  )}
                 </label>
 
                 <label className="field">
@@ -777,19 +827,14 @@ function App() {
                   <input
                     type="file"
                     accept=".pdf,.png,.jpg,.jpeg"
-                    onChange={(e) =>
-                      setVerifyForm((v) => ({
-                        ...v,
-                        certificateFileName: e.target.files?.[0]?.name || '',
-                      }))
-                    }
+                    onChange={(e) => onPickCertificate(e.target.files?.[0] || null)}
                     required
                   />
-                  <div className="hint">
-                    {verifyForm.certificateFileName
-                      ? `Uploaded: ${verifyForm.certificateFileName}`
-                      : 'Required (PDF)'}
-                  </div>
+                  {verifyForm.certificateDataUrl ? (
+                    <div className="hint success">Certificate ready ({verifyForm.certificateFileName})</div>
+                  ) : (
+                    <div className="hint danger">Required</div>
+                  )}
                 </label>
               </div>
 
@@ -1190,11 +1235,11 @@ function App() {
                     <div className="field">
                       <span className="label">Fees & charges</span>
                       <textarea
-                        value={productDraft.fees}
+                        value={productDraft.charges}
                         onChange={(e) =>
-                          setProductDraft((p) => ({ ...p, fees: e.target.value }))
+                          setProductDraft((p) => ({ ...p, charges: e.target.value }))
                         }
-                        placeholder="Application fees, service fees, penalties, etc."
+                        placeholder="Application fees, service charges, penalties, etc."
                         rows={3}
                       />
                     </div>
@@ -1574,7 +1619,7 @@ function App() {
                               minDurationMonths: '',
                               maxDurationMonths: '',
                               requirements: [],
-                              fees: '',
+                              charges: '',
                               eligibility: [],
                               repaymentFrequency: 'Monthly',
                               minAmount: '',
