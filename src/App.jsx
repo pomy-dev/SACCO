@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { ClipLoader } from 'react-spinners'
 import './App.css'
 import CompanyLogo from './assets/Img/logo.jpg'
 
@@ -94,6 +95,7 @@ function App() {
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.session, JSON.stringify(session))
   }, [session])
+
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.draft, JSON.stringify(draft))
   }, [draft])
@@ -145,9 +147,9 @@ function App() {
     latitude: draft?.company?.latitude ?? '',
     longitude: draft?.company?.longitude ?? '',
     themeColor: draft?.company?.themeColor || '#6d28d9',
-    logoDataUrl: draft?.company?.logoDataUrl || '',
-    consentFileName: draft?.company?.consentFileName || '',
-    certificateFileName: draft?.company?.certificateFileName || '',
+    logoFile: { name: draft?.company?.name, url: draft?.company?.url } || {},
+    consentFile: { name: draft?.company?.name, url: draft?.company?.url } || {},
+    certificateFile: { name: draft?.company?.name, url: draft?.company?.url } || {},
     supportEmail: draft?.company?.supportEmail || '',
     companyPhone: draft?.company?.companyPhone || '',
     whatsapp: draft?.company?.whatsapp || '',
@@ -156,8 +158,6 @@ function App() {
     instagram: draft?.company?.instagram || '',
     website: draft?.company?.website || '',
     operationalHours: draft?.company?.operationalHours || '',
-    consentDataUrl: draft?.company?.consentDataUrl || '',
-    certificateDataUrl: draft?.company?.certificateDataUrl || '',
   }))
 
   const [indabukoLogoOk, setIndabukoLogoOk] = useState(true)
@@ -199,6 +199,7 @@ function App() {
   const [editingId, setEditingId] = useState(null)
   const [view, setView] = useState('edit')
   const [submittedAt, setSubmittedAt] = useState(() => draft?.submittedAt || null)
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     const themeColor = draft?.company?.themeColor || verifyForm.themeColor
@@ -208,7 +209,10 @@ function App() {
   async function onPickLogo(file) {
     if (!file) return
     const dataUrl = await readFileAsDataUrl(file)
-    setVerifyForm((v) => ({ ...v, logoDataUrl: dataUrl }))
+    setVerifyForm((v) => ({
+      ...v,
+      logoFile: { name: file.name, url: dataUrl }
+    }))
   }
 
   async function onPickConsent(file) {
@@ -216,8 +220,7 @@ function App() {
     const dataUrl = await readFileAsDataUrl(file);
     setVerifyForm((v) => ({
       ...v,
-      consentDataUrl: dataUrl,
-      consentFileName: file.name,
+      consentFile: { name: file.name, url: dataUrl }
     }));
   }
 
@@ -226,8 +229,7 @@ function App() {
     const dataUrl = await readFileAsDataUrl(file);
     setVerifyForm((v) => ({
       ...v,
-      certificateDataUrl: dataUrl,
-      certificateFileName: file.name,
+      certificateFile: { name: file.name, url: dataUrl }
     }));
   }
 
@@ -286,9 +288,9 @@ function App() {
     setOtpError('');
     const name = verifyForm.companyName.trim();
     if (!name) return setOtpError('Company name is required.');
-    if (!verifyForm.logoDataUrl) return setOtpError('Company logo is required.');
-    if (!verifyForm.consentDataUrl) return setOtpError('Signed consent document is required.');
-    if (!verifyForm.certificateDataUrl) return setOtpError('Company verification certificate is required.');
+    if (!verifyForm.logoFile?.url) return setOtpError('Company logo is required.');
+    if (!verifyForm.consentFile?.url) return setOtpError('Signed consent document is required.');
+    if (!verifyForm.certificateFile?.url) return setOtpError('Company verification certificate is required.');
 
     const nextCompany = {
       ...(draft?.company || {}),
@@ -298,11 +300,9 @@ function App() {
       latitude: verifyForm.latitude === '' ? '' : clampNumber(Number(verifyForm.latitude), { min: -90, max: 90 }),
       longitude: verifyForm.longitude === '' ? '' : clampNumber(Number(verifyForm.longitude), { min: -180, max: 180 }),
       themeColor: verifyForm.themeColor,
-      logoDataUrl: verifyForm.logoDataUrl,
-      consentDataUrl: verifyForm.consentDataUrl,
-      certificateDataUrl: verifyForm.certificateDataUrl,
-      consentFileName: verifyForm.consentFileName,
-      certificateFileName: verifyForm.certificateFileName,
+      logoFile: { name: verifyForm.logoFile?.name, url: verifyForm.logoFile?.url },
+      consentFile: { name: verifyForm.consentFile?.name, url: verifyForm.consentFile?.url },
+      certificateFile: { name: verifyForm.certificateFile?.name, url: verifyForm.certificateFile?.url },
       supportEmail: verifyForm.supportEmail.trim(),
       companyPhone: verifyForm.companyPhone.trim(),
       whatsapp: verifyForm.whatsapp.trim(),
@@ -495,14 +495,8 @@ function App() {
   }
 
   async function submitAll() {
-    // const ts = Date.now()
-    // setSubmittedAt(ts)
-    // setDraft((d) => ({ ...(d || {}), submittedAt: ts, updatedAt: ts }))
-    // setView('submitted')
-
-    console.log('Data: ', draft)
-
     try {
+      setIsSubmitting(true)
       const payload = {
         SaccoEntity: draft?.company || {},
         SaccoEntityProducts: draft?.products || [],
@@ -520,21 +514,18 @@ function App() {
       }
 
       const result = await response.json();
-      console.log('✅ Submitted to MongoDB + Cloudinary:', result);
 
-      // === DESTROY LOCAL STORAGE ===
-      localStorage.removeItem(STORAGE_KEYS.draft);
-      // localStorage.removeItem(STORAGE_KEYS.session);
-
-      setDraft(null);
-      setSession(null);
-      setSubmittedAt(Date.now());
-      setView('submitted');
+      const ts = Date.now()
+      setSubmittedAt(ts)
+      setDraft((d) => ({ ...(d || {}), submittedAt: ts, updatedAt: ts }))
+      setView('submitted')
 
       alert(`Success! ${result.message}\n\nYou can now view your products in the Business Link app.`);
     } catch (err) {
       console.error(err);
       setOtpError(`Submission failed: ${err.message}`);
+    } finally {
+      setIsSubmitting(false)
     }
   }
 
@@ -567,7 +558,7 @@ function App() {
             aria-label="Toggle dark mode"
             title="Toggle dark mode"
           >
-            {theme === 'dark' ? 'Dark 🌙' : 'Light 🔆'}
+            {theme === 'dark' ? 'Light 🔆' : 'Dark 🌙'}
           </button>
 
           <button className="btn ghost" type="button" onClick={resetPortal}>
@@ -606,7 +597,7 @@ function App() {
         ) : step === 'email' ? (
           <section className="card">
             <div className="cardHeader">
-              <h1>Enter company email</h1>
+              <h1>Enter Company Email</h1>
               <p>
                 For simplicity, start by confirming your email via OTP. After OTP, you’ll complete
                 your company profile (name, theme, documents, and coordinates).
@@ -660,7 +651,7 @@ function App() {
         ) : step === 'details' ? (
           <section className="card">
             <div className="cardHeader">
-              <h1>Company details</h1>
+              <h1>Company Details</h1>
               <p>
                 Complete your company profile. These details help clients identify your SACCO, contact you,
                 and learn about your products and operating hours.
@@ -797,9 +788,9 @@ function App() {
                     onChange={(e) => onPickLogo(e.target.files?.[0] || null)}
                     required
                   />
-                  {verifyForm.logoDataUrl ? (
+                  {verifyForm.logoFile?.url ? (
                     <div className="logoPreview">
-                      <img src={verifyForm.logoDataUrl} alt="Company logo preview" />
+                      <img src={verifyForm.logoFile?.url} alt="Company logo preview" />
                       <div className="hint success">Logo ready</div>
                     </div>
                   ) : (
@@ -815,8 +806,8 @@ function App() {
                     onChange={(e) => onPickConsent(e.target.files?.[0] || null)}
                     required
                   />
-                  {verifyForm.consentDataUrl ? (
-                    <div className="hint success">Consent ready ({verifyForm.consentFileName})</div>
+                  {verifyForm.consentFile?.url ? (
+                    <div className="hint success">Consent ready ({verifyForm.consentFile?.name})</div>
                   ) : (
                     <div className="hint danger">Required</div>
                   )}
@@ -830,8 +821,8 @@ function App() {
                     onChange={(e) => onPickCertificate(e.target.files?.[0] || null)}
                     required
                   />
-                  {verifyForm.certificateDataUrl ? (
-                    <div className="hint success">Certificate ready ({verifyForm.certificateFileName})</div>
+                  {verifyForm.certificateFile?.url ? (
+                    <div className="hint success">Certificate ready ({verifyForm.certificateFile?.name})</div>
                   ) : (
                     <div className="hint danger">Required</div>
                   )}
@@ -920,9 +911,9 @@ function App() {
                   onClick={saveCompanyDetailsAndContinue}
                   disabled={
                     !verifyForm.companyName.trim() ||
-                    !verifyForm.logoDataUrl ||
-                    !verifyForm.consentFileName ||
-                    !verifyForm.certificateFileName
+                    !verifyForm.logoFile?.url ||
+                    !verifyForm.consentFile?.url ||
+                    !verifyForm.certificateFile?.url
                   }
                 >
                   Continue to products
@@ -1000,8 +991,8 @@ function App() {
                       stays open for <strong>18 hours</strong> after verification.
                     </p>
                   </div>
-                  {draft?.company?.logoDataUrl ? (
-                    <img className="companyLogo" src={draft.company.logoDataUrl} alt="" />
+                  {draft?.company?.logoFile?.url ? (
+                    <img className="companyLogo" src={draft.company.logoFile?.url} alt="" />
                   ) : (
                     <div className="companyLogo placeholder" aria-hidden="true">
                       {String(headerCompany || 'S').slice(0, 1).toUpperCase()}
@@ -1749,7 +1740,17 @@ function App() {
                         Back to review
                       </button>
                       <button className="btn primary" type="button" onClick={submitAll} disabled={products.length === 0}>
-                        Submit products
+                        {isSubmitting ? (
+                          <ClipLoader
+                            color={'#AAA'}
+                            loading={isSubmitting}
+                            // cssOverride={override}
+                            size={10}
+                            aria-label="Loading Spinner"
+                            data-testid="loader"
+                          />
+                        )
+                          : 'Submit products'}
                       </button>
                     </div>
 
