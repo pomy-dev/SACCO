@@ -27,6 +27,30 @@ function clampNumber(n, { min, max }) {
   return n
 }
 
+function parseCoordInput(value, { min, max }) {
+  const s = String(value ?? '').trim()
+  if (!s) return ''
+  const n = Number(s)
+  if (Number.isNaN(n)) return NaN
+  return clampNumber(n, { min, max })
+}
+
+function normalizeBranchesInput(branches) {
+  const arr = Array.isArray(branches) ? branches : []
+  if (!arr.length) return []
+
+  const toCoordString = (v) => {
+    if (v === null || v === undefined || v === '') return ''
+    return String(v)
+  }
+
+  return arr.map((b) => ({
+    directionsText: String(b?.directionsText ?? b?.address ?? '').trim(),
+    latitude: toCoordString(b?.latitude),
+    longitude: toCoordString(b?.longitude),
+  }))
+}
+
 function normalizeList(value) {
   if (!value) return []
   if (Array.isArray(value)) {
@@ -93,11 +117,13 @@ function App() {
   )
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.session, JSON.stringify(session))
+    if (session === null) localStorage.removeItem(STORAGE_KEYS.session)
+    else localStorage.setItem(STORAGE_KEYS.session, JSON.stringify(session))
   }, [session])
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.draft, JSON.stringify(draft))
+    if (draft === null) localStorage.removeItem(STORAGE_KEYS.draft)
+    else localStorage.setItem(STORAGE_KEYS.draft, JSON.stringify(draft))
   }, [draft])
 
   const isLocked = useMemo(() => {
@@ -140,25 +166,49 @@ function App() {
   const [otpError, setOtpError] = useState('')
   const [otpValue, setOtpValue] = useState('')
 
-  const [verifyForm, setVerifyForm] = useState(() => ({
-    companyName: draft?.company?.companyName || '',
-    email: draft?.company?.email || '',
-    directionsText: draft?.company?.directionsText || '',
-    latitude: draft?.company?.latitude ?? '',
-    longitude: draft?.company?.longitude ?? '',
-    themeColor: draft?.company?.themeColor || '#6d28d9',
-    logoFile: { name: draft?.company?.name, url: draft?.company?.url } || {},
-    consentFile: { name: draft?.company?.name, url: draft?.company?.url } || {},
-    certificateFile: { name: draft?.company?.name, url: draft?.company?.url } || {},
-    supportEmail: draft?.company?.supportEmail || '',
-    companyPhone: draft?.company?.companyPhone || '',
-    whatsapp: draft?.company?.whatsapp || '',
-    twitter: draft?.company?.twitter || '',
-    facebook: draft?.company?.facebook || '',
-    instagram: draft?.company?.instagram || '',
-    website: draft?.company?.website || '',
-    operationalHours: draft?.company?.operationalHours || '',
-  }))
+  const [verifyForm, setVerifyForm] = useState(() => {
+    const branchesFromDraft = normalizeBranchesInput(draft?.company?.branches)
+    const hasLegacyCoords =
+      Boolean(draft?.company?.directionsText) ||
+      draft?.company?.latitude !== '' ||
+      draft?.company?.longitude !== ''
+
+    const legacyBranch = hasLegacyCoords
+      ? [
+        {
+          directionsText: draft?.company?.directionsText || '',
+          latitude:
+            draft?.company?.latitude === '' || draft?.company?.latitude === undefined
+              ? ''
+              : String(draft?.company?.latitude),
+          longitude:
+            draft?.company?.longitude === '' || draft?.company?.longitude === undefined
+              ? ''
+              : String(draft?.company?.longitude),
+        },
+      ]
+      : [{ directionsText: '', latitude: '', longitude: '' }]
+
+    const branches = branchesFromDraft.length ? branchesFromDraft : legacyBranch
+
+    return {
+      companyName: draft?.company?.companyName || '',
+      email: draft?.company?.email || '',
+      branches,
+      themeColor: draft?.company?.themeColor || '#6d28d9',
+      logoFile: { name: draft?.company?.name, url: draft?.company?.url } || {},
+      consentFile: { name: draft?.company?.name, url: draft?.company?.url } || {},
+      certificateFile: { name: draft?.company?.name, url: draft?.company?.url } || {},
+      supportEmail: draft?.company?.supportEmail || '',
+      companyPhone: draft?.company?.companyPhone || '',
+      whatsapp: draft?.company?.whatsapp || '',
+      twitter: draft?.company?.twitter || '',
+      facebook: draft?.company?.facebook || '',
+      instagram: draft?.company?.instagram || '',
+      website: draft?.company?.website || '',
+      operationalHours: draft?.company?.operationalHours || '',
+    }
+  })
 
   const [indabukoLogoOk, setIndabukoLogoOk] = useState(true)
 
@@ -200,6 +250,7 @@ function App() {
   const [view, setView] = useState('edit')
   const [submittedAt, setSubmittedAt] = useState(() => draft?.submittedAt || null)
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const hasSubmitted = Boolean(submittedAt)
 
   useEffect(() => {
     const themeColor = draft?.company?.themeColor || verifyForm.themeColor
@@ -292,13 +343,43 @@ function App() {
     if (!verifyForm.consentFile?.url) return setOtpError('Signed consent document is required.');
     if (!verifyForm.certificateFile?.url) return setOtpError('Company verification certificate is required.');
 
+    // Normalize branch addresses + coordinates as a bundle.
+    const inputBranches = Array.isArray(verifyForm.branches) ? verifyForm.branches : []
+    const normalizedBranches = []
+    for (const b of inputBranches) {
+      const directionsText = String(b?.directionsText ?? '').trim()
+      const latitude = parseCoordInput(b?.latitude, { min: -90, max: 90 })
+      const longitude = parseCoordInput(b?.longitude, { min: -180, max: 180 })
+
+      const hasAnyValue = Boolean(directionsText) || latitude !== '' || longitude !== ''
+      if (!hasAnyValue) continue
+
+      if (Number.isNaN(latitude) || Number.isNaN(longitude)) {
+        return setOtpError('Latitude and longitude must be valid numbers.')
+      }
+      if ((latitude === '' && longitude !== '') || (latitude !== '' && longitude === '')) {
+        return setOtpError('Provide both latitude and longitude for a branch.')
+      }
+
+      normalizedBranches.push({
+        directionsText,
+        latitude: latitude === '' ? '' : latitude,
+        longitude: longitude === '' ? '' : longitude,
+      })
+    }
+
+    const firstBranch = normalizedBranches[0] || { directionsText: '', latitude: '', longitude: '' }
+
     const nextCompany = {
       ...(draft?.company || {}),
       companyName: name,
       email: verifyForm.email.trim().toLowerCase(),
-      directionsText: verifyForm.directionsText.trim(),
-      latitude: verifyForm.latitude === '' ? '' : clampNumber(Number(verifyForm.latitude), { min: -90, max: 90 }),
-      longitude: verifyForm.longitude === '' ? '' : clampNumber(Number(verifyForm.longitude), { min: -180, max: 180 }),
+      // New structure: multiple branches, each bundling address + coordinates.
+      branches: normalizedBranches,
+      // Backward-compatible fields (server may still read these today).
+      directionsText: firstBranch.directionsText,
+      latitude: firstBranch.latitude,
+      longitude: firstBranch.longitude,
       themeColor: verifyForm.themeColor,
       logoFile: { name: verifyForm.logoFile?.name, url: verifyForm.logoFile?.url },
       consentFile: { name: verifyForm.consentFile?.name, url: verifyForm.consentFile?.url },
@@ -321,13 +402,70 @@ function App() {
   function resetPortal() {
     setSession(null)
     setDraft(null)
+    localStorage.removeItem(STORAGE_KEYS.session)
+    localStorage.removeItem(STORAGE_KEYS.draft)
+
+    // Reset all user-editable fields back to defaults.
+    setVerifyForm({
+      companyName: '',
+      email: '',
+      branches: [{ directionsText: '', latitude: '', longitude: '' }],
+      themeColor: '#6d28d9',
+      logoFile: {},
+      consentFile: {},
+      certificateFile: {},
+      supportEmail: '',
+      companyPhone: '',
+      whatsapp: '',
+      twitter: '',
+      facebook: '',
+      instagram: '',
+      website: '',
+      operationalHours: '',
+    })
+
+    setProductDraft({
+      name: '',
+      summary: '',
+      description: '',
+      category: 'Savings',
+      interestRateApr: '',
+      minDurationMonths: '',
+      maxDurationMonths: '',
+      requirements: [],
+      charges: '',
+      eligibility: [],
+      repaymentFrequency: 'Monthly',
+      minAmount: '',
+      maxAmount: '',
+      collateral: '',
+      processingTime: '',
+      applicationSteps: [],
+      monthlyPremium: '',
+      coverageAmount: '',
+      policyType: 'Life',
+      coverageDetails: [],
+      minInvestment: '',
+      expectedReturns: '',
+      riskLevel: 'Medium',
+      investmentStrategy: '',
+      minBalance: '',
+      compoundingFrequency: 'Monthly',
+    })
+
+    setRequirementsInput('')
+    setEligibilityInput('')
+    setApplicationStepsInput('')
+    setCoverageDetailsInput('')
+
+    setIsSubmitting(false)
+    setView('edit')
+    setEditingId(null)
+    setSubmittedAt(null)
     setOtpRequested(false)
     otpRef.current = { value: null, createdAt: 0 }
     setOtpValue('')
     setOtpError('')
-    setEditingId(null)
-    setView('edit')
-    setSubmittedAt(null)
     setStep('email')
   }
 
@@ -637,6 +775,7 @@ function App() {
                       email: verifyForm.email.trim(),
                     })
                   }
+                  disabled={verifyForm.email === ''}
                 >
                   Save draft
                 </button>
@@ -829,42 +968,103 @@ function App() {
                 </label>
               </div>
 
-              {/* Existing optional fields (directions, lat/long, theme color) */}
-              <div className="grid two">
-                <label className="field">
-                  <span className="label">Directions / address (optional)</span>
-                  <input
-                    value={verifyForm.directionsText}
-                    onChange={(e) =>
-                      setVerifyForm((v) => ({ ...v, directionsText: e.target.value }))
-                    }
-                    placeholder="e.g. Mbabane, Plot 12, Main Road"
-                    autoComplete="street-address"
-                  />
-                </label>
+              {/* Multi-branch address + coordinates editor */}
+              <div className="field">
+                <span className="label">Branch addresses & coordinates (optional)</span>
+                <div className="stack" style={{ gap: 12 }}>
+                  {verifyForm.branches.map((b, idx) => (
+                    <div key={idx}>
+                      <div className="grid two">
+                        <label className="field">
+                          <span className="label">Directions / address</span>
+                          <input
+                            value={b.directionsText}
+                            onChange={(e) => {
+                              const nextDirections = e.target.value
+                              setVerifyForm((v) => {
+                                const next = (v.branches || []).map((x, i) =>
+                                  i === idx ? { ...x, directionsText: nextDirections } : x,
+                                )
+                                return { ...v, branches: next }
+                              })
+                            }}
+                            placeholder="e.g. Mbabane, Plot 12, Main Road"
+                            autoComplete="street-address"
+                          />
+                        </label>
 
-                <div className="grid two tight">
-                  <label className="field">
-                    <span className="label">Latitude (optional)</span>
-                    <input
-                      value={verifyForm.latitude}
-                      onChange={(e) => setVerifyForm((v) => ({ ...v, latitude: e.target.value }))}
-                      placeholder="-26.305"
-                      inputMode="decimal"
-                    />
-                  </label>
-                  <label className="field">
-                    <span className="label">Longitude (optional)</span>
-                    <input
-                      value={verifyForm.longitude}
-                      onChange={(e) =>
-                        setVerifyForm((v) => ({ ...v, longitude: e.target.value }))
-                      }
-                      placeholder="31.136"
-                      inputMode="decimal"
-                    />
-                  </label>
+                        <div className="grid two tight">
+                          <label className="field">
+                            <span className="label">Latitude</span>
+                            <input
+                              value={b.latitude}
+                              onChange={(e) => {
+                                const nextLatitude = e.target.value
+                                setVerifyForm((v) => {
+                                  const next = (v.branches || []).map((x, i) =>
+                                    i === idx ? { ...x, latitude: nextLatitude } : x,
+                                  )
+                                  return { ...v, branches: next }
+                                })
+                              }}
+                              placeholder="-26.305"
+                              inputMode="decimal"
+                            />
+                          </label>
+                          <label className="field">
+                            <span className="label">Longitude</span>
+                            <input
+                              value={b.longitude}
+                              onChange={(e) => {
+                                const nextLongitude = e.target.value
+                                setVerifyForm((v) => {
+                                  const next = (v.branches || []).map((x, i) =>
+                                    i === idx ? { ...x, longitude: nextLongitude } : x,
+                                  )
+                                  return { ...v, branches: next }
+                                })
+                              }}
+                              placeholder="31.136"
+                              inputMode="decimal"
+                            />
+                          </label>
+                        </div>
+                      </div>
+
+                      <div className="actions" style={{ justifyContent: 'flex-end', marginTop: 8 }}>
+                        <button
+                          className="btn small ghost"
+                          type="button"
+                          onClick={() => {
+                            setVerifyForm((v) => {
+                              const next = v.branches.filter((_, i) => i !== idx)
+                              return { ...v, branches: next.length ? next : [{ directionsText: '', latitude: '', longitude: '' }] }
+                            })
+                          }}
+                          disabled={verifyForm.branches.length === 1}
+                        >
+                          Cancel Address
+                        </button>
+                      </div>
+                    </div>
+                  ))}
                 </div>
+
+                <div className="actions" style={{ justifyContent: 'flex-start', marginTop: 10 }}>
+                  <button
+                    className="btn small"
+                    type="button"
+                    onClick={() =>
+                      setVerifyForm((v) => ({
+                        ...v,
+                        branches: [...(v.branches || []), { directionsText: '', latitude: '', longitude: '' }],
+                      }))
+                    }
+                  >
+                    + Add Address Branch
+                  </button>
+                </div>
+                <div className="hint">Each branch bundles its address and coordinates together.</div>
               </div>
 
               <div className='grid two'>
@@ -1007,6 +1207,7 @@ function App() {
                     className={view === 'edit' ? 'tab active' : 'tab'}
                     type="button"
                     onClick={() => setView('edit')}
+                    disabled={hasSubmitted || isSubmitting}
                   >
                     Create / Edit
                   </button>
@@ -1014,6 +1215,7 @@ function App() {
                     className={view === 'review' ? 'tab active' : 'tab'}
                     type="button"
                     onClick={() => setView('review')}
+                    disabled={hasSubmitted || isSubmitting}
                   >
                     Review ({products.length})
                   </button>
@@ -1021,7 +1223,7 @@ function App() {
                     className={view === 'submitted' ? 'tab active' : 'tab'}
                     type="button"
                     onClick={() => setView('submitted')}
-                    disabled={products.length === 0}
+                    disabled={hasSubmitted ? true : products.length === 0 || isSubmitting}
                   >
                     Submit
                   </button>
@@ -1711,12 +1913,26 @@ function App() {
                           <div className="v">{draft?.company?.email || '—'}</div>
                           <div className="k">Coordinates</div>
                           <div className="v">
-                            {draft?.company?.latitude !== '' && draft?.company?.longitude !== ''
-                              ? `${draft.company.latitude}, ${draft.company.longitude}`
-                              : '—'}
+                            {Array.isArray(draft?.company?.branches) && draft.company.branches.length
+                              ? draft.company.branches.map((b, i) => (
+                                <div key={i}>
+                                  {b?.latitude !== '' && b?.longitude !== ''
+                                    ? `${b.latitude}, ${b.longitude}`
+                                    : '—'}
+                                </div>
+                              ))
+                              : draft?.company?.latitude !== '' && draft?.company?.longitude !== ''
+                                ? `${draft.company.latitude}, ${draft.company.longitude}`
+                                : '—'}
                           </div>
                           <div className="k">Directions</div>
-                          <div className="v">{draft?.company?.directionsText || '—'}</div>
+                          <div className="v">
+                            {Array.isArray(draft?.company?.branches) && draft.company.branches.length
+                              ? draft.company.branches.map((b, i) => (
+                                <div key={i}>{b?.directionsText || '—'}</div>
+                              ))
+                              : draft?.company?.directionsText || '—'}
+                          </div>
                         </div>
                       </div>
 
@@ -1736,15 +1952,25 @@ function App() {
                     </div>
 
                     <div className="actions">
-                      <button className="btn" type="button" onClick={() => setView('review')}>
+                      <button
+                        className="btn"
+                        type="button"
+                        onClick={() => setView('review')}
+                        disabled={hasSubmitted || isSubmitting}
+                      >
                         Back to review
                       </button>
-                      <button className="btn primary" type="button" onClick={submitAll} disabled={products.length === 0}>
+
+                      <button
+                        className="btn primary"
+                        type="button"
+                        onClick={submitAll}
+                        disabled={hasSubmitted || products.length === 0 || isSubmitting}
+                      >
                         {isSubmitting ? (
                           <ClipLoader
                             color={'#AAA'}
                             loading={isSubmitting}
-                            // cssOverride={override}
                             size={10}
                             aria-label="Loading Spinner"
                             data-testid="loader"
