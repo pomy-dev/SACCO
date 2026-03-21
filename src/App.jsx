@@ -3,7 +3,7 @@ import { ClipLoader } from 'react-spinners'
 import './App.css'
 import CompanyLogo from './assets/Img/logo.jpg'
 
-const MongoDBURL = 'http://10.150.51.51:5000'
+const API_BASE_URL = 'http://10.150.51.51:5000'
 
 const STORAGE_KEYS = {
   theme: 'sacco_portal_theme',
@@ -165,6 +165,8 @@ function App() {
   const [otpRequested, setOtpRequested] = useState(false)
   const [otpError, setOtpError] = useState('')
   const [otpValue, setOtpValue] = useState('')
+  const [isRequestingOtp, setIsRequestingOtp] = useState(false)
+  const [isVerifyOtp, setIsVerifyOtp] = useState(false)
 
   const [verifyForm, setVerifyForm] = useState(() => {
     const branchesFromDraft = normalizeBranchesInput(draft?.company?.branches)
@@ -293,46 +295,102 @@ function App() {
     }))
   }
 
-  function requestOtp() {
-    setOtpError('')
-    const email = verifyForm.email.trim()
-    if (!email || !email.includes('@')) return setOtpError('A valid email is required.')
+  async function requestOtp() {
+    setOtpError('');
+    const email = verifyForm.email.trim();
 
-    const otp = String(Math.floor(100000 + Math.random() * 900000))
-    otpRef.current = { value: otp, createdAt: Date.now() }
-    setOtpRequested(true)
-    setOtpValue('')
-    setStep('otp')
-
-    const nextCompany = {
-      ...(draft?.company || {}),
-      email,
+    if (!email || !email.includes('@')) {
+      return setOtpError('A valid email is required.');
     }
-    persistCompanyDraft(nextCompany)
 
-    console.info('[SACCO Portal] OTP (demo):', otp, '→', email)
+    try {
+      setIsRequestingOtp(true)
+
+      const response = await fetch(`${API_BASE_URL}/api/request-otp`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to request OTP');
+      }
+
+      // Success → move to OTP input screen
+      // otpRef.current = { value: otp, createdAt: Date.now() }
+      setOtpRequested(true);
+      setOtpValue('');
+      setStep('otp');
+
+      const nextCompany = {
+        ...(draft?.company || {}),
+        email,
+      }
+      persistCompanyDraft(nextCompany)
+
+      // Optional: nice user feedback
+      alert('OTP sent! Check your email (including spam/junk folder). It expires in 10 minutes.');
+
+    } catch (err) {
+      console.error('OTP request failed:', err);
+      setOtpError(err.message || 'Could not send OTP. Please try again.');
+    } finally {
+      setIsRequestingOtp(false)
+    }
   }
 
-  function verifyOtp() {
-    setOtpError('')
-    const expected = otpRef.current.value
-    if (!otpRequested || !expected) return setOtpError('Please request an OTP first.')
-    if (otpValue.trim() !== expected) return setOtpError('Incorrect OTP. Please try again.')
+  async function verifyOtp() {
+    setOtpError('');
+    const email = verifyForm.email.trim();
+    const code = otpValue.trim();
 
-    const createdAt = otpRef.current.createdAt
-    const otpAgeMs = Date.now() - createdAt
-    if (otpAgeMs > 10 * 60 * 1000) return setOtpError('OTP expired. Please request a new one.')
+    if (!code || code.length !== 6) {
+      return setOtpError('Please enter the 6-digit code from your email.');
+    }
 
-    const startAt = Date.now()
-    const expiresAt = startAt + 18 * 60 * 60 * 1000
-    setSession({
-      verified: true,
-      startAt,
-      expiresAt,
-      companyEmail: draft?.company?.email || verifyForm.email.trim(),
-      companyName: draft?.company?.companyName || '',
-    })
-    setStep(hasCompanyDetails ? 'products' : 'details')
+    try {
+      setIsVerifyOtp(true);
+
+      if (!otpRequested) return setOtpError('Please request an OTP first.')
+
+      const response = await fetch(`${API_BASE_URL}/api/verify-otp`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email, otp: code }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) throw new Error(data.error || 'Verification failed');
+
+      if (data.error) setOtpError('Incorrect OTP. Please try again.');
+
+      // Success – create session and proceed
+      const startAt = Date.now();
+      const expiresAt = startAt + 18 * 60 * 60 * 1000; // 18 hours
+
+      setSession({
+        verified: true,
+        startAt,
+        expiresAt,
+        companyEmail: email,
+        companyName: verifyForm.companyName.trim() || '',
+      });
+
+      setStep(hasCompanyDetails ? 'products' : 'details');
+
+    } catch (err) {
+      console.error('OTP verification failed:', err);
+      setOtpError(err.message || 'Invalid or expired OTP. Please try again.');
+    } finally {
+      setIsVerifyOtp(false);
+    }
   }
 
   function saveCompanyDetailsAndContinue() {
@@ -640,7 +698,7 @@ function App() {
         SaccoEntityProducts: draft?.products || [],
       };
 
-      const response = await fetch(`${MongoDBURL}/api/submit-sacco`, {
+      const response = await fetch(`${API_BASE_URL}/api/submit-sacco`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -764,7 +822,15 @@ function App() {
 
               <div className="actions">
                 <button className="btn primary" type="button" onClick={requestOtp}>
-                  Send OTP to email
+                  {isRequestingOtp ? (
+                    <ClipLoader
+                      color={'#AAA'}
+                      loading={isRequestingOtp}
+                      size={10}
+                      aria-label="Loading Spinner"
+                      data-testid="loader"
+                    />
+                  ) : 'Send OTP'}
                 </button>
                 <button
                   className="btn"
@@ -1156,6 +1222,7 @@ function App() {
                   <span className="label">OTP code</span>
                   <input
                     value={otpValue}
+                    type='number'
                     onChange={(e) =>
                       setOtpValue(e.target.value.replace(/[^\d]/g, '').slice(0, 6))
                     }
@@ -1165,7 +1232,16 @@ function App() {
                   />
                 </label>
                 <button className="btn primary" type="button" onClick={verifyOtp}>
-                  Verify & continue
+                  {isVerifyOtp ?
+                    (
+                      <ClipLoader
+                        color={'#AAA'}
+                        loading={isVerifyOtp}
+                        size={10}
+                        aria-label="Loading Spinner"
+                        data-testid="loader"
+                      />
+                    ) : 'Verify'}
                 </button>
               </div>
 
