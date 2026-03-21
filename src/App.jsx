@@ -3,7 +3,7 @@ import { ClipLoader } from 'react-spinners'
 import './App.css'
 import CompanyLogo from './assets/Img/logo.jpg'
 
-const API_BASE_URL = 'https://phone-bool-eswatini.onrender.com/'
+const API_BASE_URL = 'https://phone-bool-eswatini.onrender.com'
 
 const STORAGE_KEYS = {
   theme: 'sacco_portal_theme',
