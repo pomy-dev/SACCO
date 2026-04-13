@@ -289,6 +289,7 @@ function App() {
   const [coverageDetailsInput, setCoverageDetailsInput] = useState('')
 
   const products = draft?.products ?? []
+  const promotingProduct = products.find((p) => p.id === promotingId || p._id === promotingId)
   const [editingId, setEditingId] = useState(null)
   const [view, setView] = useState('edit')
   const [submittedAt, setSubmittedAt] = useState(() => draft?.submittedAt || null)
@@ -437,7 +438,41 @@ function App() {
       if (registeredData?.companyName && registeredData.logoFile?.url && registeredData?.products) {
         // REGISTERED COMPANY → load existing data + products
 
-        setDraft(registeredData)
+        // Fetch promotions for this company
+        let saccoAds = []
+        try {
+          const promoResponse = await fetch(`${API_BASE_URL}/api/get-sacco-promotions?companyId=${registeredData?._id || registeredData?.id}`, {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' },
+          })
+          if (promoResponse.ok) {
+            saccoAds = await promoResponse.json()
+          }
+        } catch (promoErr) {
+          console.warn('Failed to fetch promotions:', promoErr)
+        }
+
+        // Update products with promotion data
+        const updatedProducts = registeredData.products.map(product => {
+          const productPromotion = saccoAds.find(promo => promo.product === product.id || promo.product === product._id)
+          if (productPromotion) {
+            return {
+              ...product,
+              promotionId: productPromotion.id || productPromotion._id || null,
+              promoCode: productPromotion.promoCode || null,
+              validUntilDate: productPromotion.validUntil || null,
+              promotion: productPromotion || null,
+            }
+          }
+          return product
+        })
+
+        const updatedDraft = {
+          ...registeredData,
+          products: updatedProducts
+        }
+
+        setDraft(updatedDraft)
         setMode('registered')
         setSubmittedAt(registeredData.createdAt || null)
         setStep('products')
@@ -456,13 +491,14 @@ function App() {
   }
 
   function startPromote(p) {
-    setPromotingId(p.id)
+    const id = p.id || p._id
+    setPromotingId(id)
     const promo = p.promotion || {}
     setPromotionDraft({
       headline: promo.headline || `Special Offer: ${p.name}`,
       promoDescription: promo.promoDescription || '',
       highlights: Array.isArray(promo.highlights) ? promo.highlights : [],
-      ctaText: promo.ctaText,
+      ctaText: promo.ctaText || 'Start Now',
       offerValidUntil: promo.offerValidUntil || '',
       specialties: Array.isArray(promo.specialties) ? promo.specialties : [],
     })
@@ -471,24 +507,39 @@ function App() {
     setView('promote')
   }
 
+  function validatePromotionDraft() {
+    if (!promotionDraft.headline.trim()) return 'Headline is required.'
+    if (promotionDraft.highlights.length === 0) return 'At least one highlight is required.'
+    if (!promotionDraft.offerValidUntil.trim()) return 'Offer valid until date is required.'
+    return null
+  }
+
   async function savePromotion() {
     if (!promotingId) return
     try {
       setIsSavingPromotion(true)
-      const product = draft?.products?.find(p => p.id === promotingId)
+      const product = draft?.products?.find((p) => p.id === promotingId || p._id === promotingId)
       if (!product) throw new Error('Product not found')
 
+      // validation
+      const validationError = validatePromotionDraft()
+
+      if (validationError) {
+        setIsSavingPromotion(false);
+        return alert(`Validation error: ${validationError}`)
+      }
+
       const payload = {
+        companyId: draft?._id || draft?.id || null,
         productId: promotingId,
-        promotion: {
+        promotionPayload: {
           ...promotionDraft,
           highlights: normalizeList(promotionDraft.highlights),
-          specialties: normalizeList(promotionDraft.specialties),
-          updatedAt: Date.now(),
+          specialties: normalizeList(promotionDraft.specialties)
         },
       }
 
-      const response = await fetch(`${API_BASE_URL}/api/save-promotion`, {
+      const response = await fetch(`${API_BASE_URL}/api/save-sacco-promotion`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -501,17 +552,30 @@ function App() {
 
       const result = await response.json()
 
-      // Update local draft
+      // Update local draft with promotion data
       setDraft((d) => {
         if (!d) return d
         const list = Array.isArray(d.products) ? d.products : []
-        const idx = list.findIndex((p) => p.id === promotingId)
-        if (idx === -1) return d
+        const idx = list.findIndex((p) => p.id === promotingId || p._id === promotingId)
+        console.log('Updating promotion for product index:', idx)
+        // if (idx !== -1) {
+        //   console.log('Passed Two.')
+        //   // return d
+        // }
         const updatedList = [...list]
         updatedList[idx] = {
           ...updatedList[idx],
-          promotion: payload.promotion,
+          promotionId: result?._id || result?.id,
+          promoCode: result?.promoCode,
+          validUntilDate: result.validUntil || promotionDraft.offerValidUntil,
+          promotion: {
+            ...promotionDraft,
+            highlights: normalizeList(promotionDraft.highlights),
+            specialties: normalizeList(promotionDraft.specialties),
+          },
         }
+
+        console.log('Passed Three:', updatedList[idx])
         return { ...d, products: updatedList, updatedAt: Date.now() }
       })
 
@@ -2308,6 +2372,23 @@ function App() {
                               minAmount: '',
                               maxAmount: '',
                               collateral: '',
+                              likes: 0,
+                              processingTime: '',
+                              accountType: 'Fixed Account',
+                              interestRateFrequency: 'Monthly',
+                              compoundingFrequency: 'Monthly',
+                              withdrawalRules: 'AnyTime',
+                              riskDisclaimer: '',
+                              coverageAmount: '',
+                              monthlyPremium: '',
+                              policyType: '',
+                              coverageDetails: [],
+                              minInvestment: '',
+                              expectedReturns: '',
+                              expectedReturnsFrequency: 'Annually',
+                              riskLevel: 'Medium',
+                              investmentStrategy: '',
+                              reviews: [],
                             })
                             setRequirementsInput('')
                             setEligibilityInput('')
@@ -2331,8 +2412,11 @@ function App() {
                     ) : (
                       <>
                         <div className="productList">
-                          {products.map((p) => (
-                            <article key={p.id} className="productCard">
+                          {products.map((p, i) => (
+                            <article key={i} className="productCard">
+                              {(p.promotionId || p.promotion) && (
+                                <div className="promotionBadge">In-Promotion</div>
+                              )}
                               <div className="productTop">
                                 <div>
                                   <div className="productName">{p.name}</div>
@@ -2352,12 +2436,13 @@ function App() {
                                 </div>
                               </div>
                               {p.summary ? <div className="productSummary">{p.summary}</div> : null}
+
                               <div className="productActions">
                                 <button className="btn small" type="button" onClick={() => editProduct(p)}>
                                   Edit
                                 </button>
 
-                                {mode === 'registered' && (
+                                {(mode === 'registered' && (!p.promotionId && !p.promotion)) && (
                                   <button
                                     className="btn small"
                                     style={{ background: 'var(--brand)', color: '#fff' }}
@@ -2400,14 +2485,14 @@ function App() {
                   <>
                     <div className="notice">
                       <div className="noticeTitle">
-                        {`Promote ${products.find((p) => p.id === promotingId)?.category || 'Product'}`}
+                        {`Promote ${promotingProduct?.category || 'Product'}`}
                       </div>
                       <div className="noticeText">
                         Create promotional content for{' '}
-                        <strong>{products.find((p) => p.id === promotingId)?.name}</strong>
+                        <strong>{promotingProduct?.name || 'your product'}</strong>
                         <br />
                         <span style={{ fontSize: '0.9rem', color: 'var(--muted)' }}>
-                          Category: {products.find((p) => p.id === promotingId)?.category}
+                          Category: {promotingProduct?.category || '—'}
                         </span>
                       </div>
                     </div>
@@ -2491,6 +2576,7 @@ function App() {
                         <span className="label">Offer valid until</span>
                         <input
                           type="date"
+                          data-date-format="YYYY-MM-DD"
                           value={promotionDraft.offerValidUntil}
                           onChange={(e) => setPromotionDraft((pd) => ({ ...pd, offerValidUntil: e.target.value }))}
                         />
@@ -2499,9 +2585,7 @@ function App() {
 
                     {/* === CATEGORY-SPECIFIC PROMOTION FIELDS === */}
                     {(() => {
-                      const prod = products.find((p) => p.id === promotingId)
-                      const cat = prod?.category || ''
-                      // if (cat === 'Loans') {
+                      const cat = promotingProduct?.category || ''
                       return (
                         <div className="promoteCategoryNotice">
                           <div className="noticeTitle">
@@ -2559,49 +2643,6 @@ function App() {
                           </div>
                         </div>
                       )
-
-                      // }
-                      // if (cat === 'Savings') {
-                      //   return (
-                      //     <div className="promoteCategoryNotice">
-                      //       <div className="noticeTitle">Savings-specific promotion</div>
-                      //       <label className="field">
-                      //         <span className="label">Bonus Interest Boost</span>
-                      //         <input
-                      //           type="text"
-                      //           value={promotionDraft.bonusInterest}
-                      //           onChange={(e) => setPromotionDraft((pd) => ({ ...pd, bonusInterest: e.target.value }))}
-                      //           placeholder="e.g. +2% for the first 6 months"
-                      //         />
-                      //       </label>
-                      //     </div>
-                      //   )
-                      // }
-                      // if (cat === 'Insurance') {
-                      //   return (
-                      //     <div className="promoteCategoryNotice">
-                      //       <div className="noticeTitle">Insurance-specific promotion</div>
-                      //       <label className="field">
-                      //         <span className="label">Add Specialties</span>
-                      //         <input
-                      //           type="text"
-                      //           value={promotionDraft.bonusInterest}
-                      //           onChange={(e) => setPromotionDraft((pd) => ({ ...pd, bonusInterest: e.target.value }))}
-                      //           placeholder="e.g. +2% for the first 6 months"
-                      //         />
-                      //       </label>
-                      //     </div>
-                      //   )
-                      // }
-                      // if (cat === 'Investments') {
-                      //   return (
-                      //     <div className="promoteCategoryNotice">
-                      //       <div className="noticeTitle">Investments-specific promotion</div>
-                      //       <div className="noticeText">Highlight guaranteed returns or low-risk entry.</div>
-                      //     </div>
-                      //   )
-                      // }
-                      // return null
                     })()}
 
                     <div className="actions">
@@ -2618,7 +2659,7 @@ function App() {
                             aria-label="Loading Spinner"
                             data-testid="loader"
                           />
-                        ) : 'Save Promotion Content'}
+                        ) : 'Save Promotion'}
                       </button>
                     </div>
                   </>
