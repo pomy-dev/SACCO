@@ -3,12 +3,14 @@ import { ClipLoader } from 'react-spinners'
 import './App.css'
 import CompanyLogo from './assets/Img/logo.jpg'
 
-const API_BASE_URL = 'https://phone-bool-eswatini.onrender.com'
+// const API_BASE_URL = 'https://phone-bool-eswatini.onrender.com'
+const API_BASE_URL = 'http://10.150.51.52:5000'
 
 const STORAGE_KEYS = {
   theme: 'sacco_portal_theme',
   session: 'sacco_portal_session_v1',
   draft: 'sacco_portal_draft_v1',
+  mode: 'sacco_portal_mode_v1',
 }
 
 function safeJsonParse(value, fallback) {
@@ -116,6 +118,21 @@ function App() {
     safeJsonParse(localStorage.getItem(STORAGE_KEYS.draft), null),
   )
 
+  const [mode, setMode] = useState(() =>
+    localStorage.getItem(STORAGE_KEYS.mode) === 'registered' ? 'registered' : 'new',
+  )
+  const [promotingId, setPromotingId] = useState(null)
+  const [promotionDraft, setPromotionDraft] = useState({
+    headline: '',
+    promoDescription: '',
+    highlights: [],
+    ctaText: 'Start Now',
+    offerValidUntil: '',
+    specialties: '',
+  })
+  const [promoHighlightsInput, setPromoHighlightsInput] = useState('')
+  const [promoSpecialtyInput, setPromoSpecialtyInput] = useState('')
+
   useEffect(() => {
     if (session === null) localStorage.removeItem(STORAGE_KEYS.session)
     else localStorage.setItem(STORAGE_KEYS.session, JSON.stringify(session))
@@ -125,6 +142,16 @@ function App() {
     if (draft === null) localStorage.removeItem(STORAGE_KEYS.draft)
     else localStorage.setItem(STORAGE_KEYS.draft, JSON.stringify(draft))
   }, [draft])
+
+  useEffect(() => {
+    if (mode === 'new') localStorage.removeItem(STORAGE_KEYS.mode)
+    else {
+      setStep('products')
+      setView('review')
+      setSubmittedAt(draft?.submittedAt || null)
+      localStorage.setItem(STORAGE_KEYS.mode, 'registered')
+    }
+  }, [mode])
 
   const isLocked = useMemo(() => {
     if (!session?.expiresAt) return false
@@ -167,6 +194,7 @@ function App() {
   const [otpValue, setOtpValue] = useState('')
   const [isRequestingOtp, setIsRequestingOtp] = useState(false)
   const [isVerifyOtp, setIsVerifyOtp] = useState(false)
+  const [isSavingPromotion, setIsSavingPromotion] = useState(false)
 
   const [verifyForm, setVerifyForm] = useState(() => {
     const branchesFromDraft = normalizeBranchesInput(draft?.company?.branches)
@@ -196,8 +224,9 @@ function App() {
     return {
       companyName: draft?.company?.companyName || '',
       email: draft?.company?.email || '',
+      startedAt: draft?.company?.startedAt || '',
       branches,
-      themeColor: draft?.company?.themeColor || '#6d28d9',
+      themeColor: draft?.company?.themeColor || draft?.themeColor || '#6d28d9',
       logoFile: { name: draft?.company?.name, url: draft?.company?.url } || {},
       consentFile: { name: draft?.company?.name, url: draft?.company?.url } || {},
       certificateFile: { name: draft?.company?.name, url: draft?.company?.url } || {},
@@ -216,35 +245,47 @@ function App() {
 
   const [productDraft, setProductDraft] = useState(() => ({
     name: '',
+    category: '',
+    accountType: '',
     summary: '',
     description: '',
     interestRateApr: '',
+    interestRateFrequency: '',
     minDurationMonths: '',
     maxDurationMonths: '',
     requirements: [],
     charges: '',
     eligibility: [],
-    repaymentFrequency: 'Monthly',
+    repaymentFrequency: '',
     minAmount: '',
     maxAmount: '',
     collateral: '',
     processingTime: '',
     applicationSteps: [],
+    benefits: [],
+    termsAndConditions: [],
     monthlyPremium: '',
     coverageAmount: '',
-    policyType: 'Life',
+    policyType: '',
     coverageDetails: [],
     minInvestment: '',
     expectedReturns: '',
-    riskLevel: 'Medium',
+    expectedReturnsFrequency: '',
+    riskLevel: '',
     investmentStrategy: '',
     minBalance: '',
-    compoundingFrequency: 'Monthly',
+    compoundingFrequency: '',
+    withdrawalRules: '',
+    riskDisclaimer: '',
+    likes: 0,
+    reviews: [],
   }))
 
   const [requirementsInput, setRequirementsInput] = useState('')
   const [eligibilityInput, setEligibilityInput] = useState('')
+  const [tsNcsInput, setTsNcsInput] = useState('')
   const [applicationStepsInput, setApplicationStepsInput] = useState('')
+  const [benefitsInput, setBenefitsInput] = useState('')
   const [coverageDetailsInput, setCoverageDetailsInput] = useState('')
 
   const products = draft?.products ?? []
@@ -344,36 +385,31 @@ function App() {
   }
 
   async function verifyOtp() {
-    setOtpError('');
-    const email = verifyForm.email.trim();
-    const code = otpValue.trim();
+    setOtpError('')
+    const email = verifyForm.email.trim()
+    const code = otpValue.trim()
 
     if (!code || code.length !== 6) {
-      return setOtpError('Please enter the 6-digit code from your email.');
+      return setOtpError('Please enter the 6-digit code from your email.')
     }
 
     try {
-      setIsVerifyOtp(true);
+      setIsVerifyOtp(true)
 
       if (!otpRequested) return setOtpError('Please request an OTP first.')
 
       const response = await fetch(`${API_BASE_URL}/api/verify-otp`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, otp: code }),
-      });
+      })
 
-      const data = await response.json();
+      const data = await response.json()
+      if (!response.ok) throw new Error(data.error || 'Verification failed')
 
-      if (!response.ok) throw new Error(data.error || 'Verification failed');
-
-      if (data.error) setOtpError('Incorrect OTP. Please try again.');
-
-      // Success – create session and proceed
-      const startAt = Date.now();
-      const expiresAt = startAt + 18 * 60 * 60 * 1000; // 18 hours
+      // Success – create session
+      const startAt = Date.now()
+      const expiresAt = startAt + 18 * 60 * 60 * 1000
 
       setSession({
         verified: true,
@@ -381,15 +417,112 @@ function App() {
         expiresAt,
         companyEmail: email,
         companyName: verifyForm.companyName.trim() || '',
-      });
+      })
 
-      setStep(hasCompanyDetails ? 'products' : 'details');
+      // === NEW: CHECK IF COMPANY IS ALREADY REGISTERED ===
+      let registeredData = null
+      try {
+        const checkResponse = await fetch(`${API_BASE_URL}/api/get-sacco-company?email=${email}`, {
+          method: 'GET',
+          headers: { 'Content-Type': 'application/json' },
+        })
 
+        if (!checkResponse.ok) return console.warn('Company registration check failed – treating as new', await checkResponse.text())
+
+        registeredData = await checkResponse.json()
+      } catch (checkErr) {
+        console.warn('Company registration check failed – treating as new', checkErr)
+      }
+
+      if (registeredData?.companyName && registeredData.logoFile?.url && registeredData?.products) {
+        // REGISTERED COMPANY → load existing data + products
+
+        setDraft(registeredData)
+        setMode('registered')
+        setSubmittedAt(registeredData.createdAt || null)
+        setStep('products')
+        setView('review')
+      } else {
+        // NEW COMPANY → normal flow
+        setMode('new')
+        setStep(hasCompanyDetails ? 'products' : 'details')
+      }
     } catch (err) {
-      console.error('OTP verification failed:', err);
-      setOtpError(err.message || 'Invalid or expired OTP. Please try again.');
+      console.error('OTP verification failed:', err)
+      setOtpError(err.message || 'Invalid or expired OTP. Please try again.')
     } finally {
-      setIsVerifyOtp(false);
+      setIsVerifyOtp(false)
+    }
+  }
+
+  function startPromote(p) {
+    setPromotingId(p.id)
+    const promo = p.promotion || {}
+    setPromotionDraft({
+      headline: promo.headline || `Special Offer: ${p.name}`,
+      promoDescription: promo.promoDescription || '',
+      highlights: Array.isArray(promo.highlights) ? promo.highlights : [],
+      ctaText: promo.ctaText,
+      offerValidUntil: promo.offerValidUntil || '',
+      specialties: Array.isArray(promo.specialties) ? promo.specialties : [],
+    })
+    setPromoHighlightsInput('')
+    setPromoSpecialtyInput('')
+    setView('promote')
+  }
+
+  async function savePromotion() {
+    if (!promotingId) return
+    try {
+      setIsSavingPromotion(true)
+      const product = draft?.products?.find(p => p.id === promotingId)
+      if (!product) throw new Error('Product not found')
+
+      const payload = {
+        productId: promotingId,
+        promotion: {
+          ...promotionDraft,
+          highlights: normalizeList(promotionDraft.highlights),
+          specialties: normalizeList(promotionDraft.specialties),
+          updatedAt: Date.now(),
+        },
+      }
+
+      const response = await fetch(`${API_BASE_URL}/api/save-promotion`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+
+      if (!response.ok) {
+        const err = await response.json()
+        throw new Error(err.error || 'Failed to save promotion')
+      }
+
+      const result = await response.json()
+
+      // Update local draft
+      setDraft((d) => {
+        if (!d) return d
+        const list = Array.isArray(d.products) ? d.products : []
+        const idx = list.findIndex((p) => p.id === promotingId)
+        if (idx === -1) return d
+        const updatedList = [...list]
+        updatedList[idx] = {
+          ...updatedList[idx],
+          promotion: payload.promotion,
+        }
+        return { ...d, products: updatedList, updatedAt: Date.now() }
+      })
+
+      alert(`✅ Promotion saved! ${result.message || 'It will now appear in the Business Link app.'}`)
+      setView('review')
+      setPromotingId(null)
+    } catch (err) {
+      console.error(err)
+      alert(`❌ Failed to save promotion: ${err.message}`)
+    } finally {
+      setIsSavingPromotion(false)
     }
   }
 
@@ -511,6 +644,19 @@ function App() {
       compoundingFrequency: 'Monthly',
     })
 
+    setMode('new')
+    setPromotingId(null)
+    setPromotionDraft({
+      headline: '',
+      promoDescription: '',
+      highlights: [],
+      ctaText: 'Apply Now',
+      offerValidUntil: '',
+      specialRate: '',
+      bonusInterest: '',
+    })
+    setPromoHighlightsInput('')
+
     setRequirementsInput('')
     setEligibilityInput('')
     setApplicationStepsInput('')
@@ -595,6 +741,14 @@ function App() {
       updatedAt: Date.now(),
     }
 
+    if (editingId) {
+      const currentProducts = draft?.products || []
+      const existing = currentProducts.find((p) => p._id === editingId)
+      if (existing?.promotion) {
+        normalized.promotion = existing.promotion
+      }
+    }
+
     setDraft((d) => {
       const current = d || { company: verifyForm, products: [] }
       const list = Array.isArray(current.products) ? current.products : []
@@ -611,30 +765,39 @@ function App() {
     setProductDraft({
       name: '',
       category: 'Savings',
+      accountType: '',
       summary: '',
       description: '',
       interestRateApr: '',
+      interestRateFrequency: '',
       minDurationMonths: '',
       maxDurationMonths: '',
       requirements: [],
       charges: '',
       eligibility: [],
-      repaymentFrequency: 'Monthly',
+      repaymentFrequency: '',
       minAmount: '',
       maxAmount: '',
       collateral: '',
       processingTime: '',
       applicationSteps: [],
+      benefits: [],
+      termsAndConditions: [],
       monthlyPremium: '',
       coverageAmount: '',
-      policyType: 'Life',
+      policyType: '',
       coverageDetails: [],
       minInvestment: '',
       expectedReturns: '',
-      riskLevel: 'Medium',
+      expectedReturnsFrequency: '',
+      riskLevel: '',
       investmentStrategy: '',
       minBalance: '',
-      compoundingFrequency: 'Monthly',
+      compoundingFrequency: '',
+      withdrawalRules: '',
+      riskDisclaimer: '',
+      likes: 0,
+      reviews: [],
     })
     setRequirementsInput('')
     setEligibilityInput('')
@@ -725,8 +888,8 @@ function App() {
     }
   }
 
-  const headerCompany = draft?.company?.companyName || session?.companyName || 'SACCO Company'
-  const headerEmail = draft?.company?.email || session?.companyEmail || ''
+  const headerCompany = draft?.company?.companyName || draft?.companyName || session?.companyName || 'SACCO Company'
+  const headerEmail = draft?.company?.email || draft?.email || session?.companyEmail || ''
 
   return (
     <div className="portal">
@@ -893,7 +1056,7 @@ function App() {
               </div>
 
               {/* New social & contact fields */}
-              <div className="grid two">
+              <div className="grid three">
                 <label className="field">
                   <span className="label">Support email</span>
                   <input
@@ -916,6 +1079,20 @@ function App() {
                       setVerifyForm((v) => ({ ...v, companyPhone: e.target.value.trim() }))
                     }
                     placeholder="e.g. +268 2400 1234"
+                  />
+                </label>
+
+                <label className="field">
+                  <span className="label">When was company started <span className="required">*</span></span>
+                  <input
+                    type='date'
+                    value={verifyForm.startedAt}
+                    onChange={(e) =>
+                      setVerifyForm((v) => ({ ...v, startedAt: e.target.value }))
+                    }
+                    placeholder="e.g. 01/01/2000"
+                    autoComplete="organization"
+                    required
                   />
                 </label>
               </div>
@@ -1263,12 +1440,14 @@ function App() {
                   <div>
                     <h1>{headerCompany}</h1>
                     <p>
-                      Add your financial products, then review everything before submitting. Access
-                      stays open for <strong>18 hours</strong> after verification.
+                      {mode === 'registered'
+                        ? 'Your company is already registered. Edit or promote existing products, or add more.'
+                        : `Add your financial products, then review everything before submitting. Access
+                           stays open for <strong>18 hours</strong> after verification.`}
                     </p>
                   </div>
-                  {draft?.company?.logoFile?.url ? (
-                    <img className="companyLogo" src={draft.company.logoFile?.url} alt="" />
+                  {(draft.company?.logoFile?.url || draft.logoFile?.url) ? (
+                    <img className="companyLogo" src={draft.company?.logoFile?.url || draft.logoFile?.url} alt="logo" />
                   ) : (
                     <div className="companyLogo placeholder" aria-hidden="true">
                       {String(headerCompany || 'S').slice(0, 1).toUpperCase()}
@@ -1348,6 +1527,7 @@ function App() {
                     </div>
 
                     {/* ==================== COMMON FIELDS ==================== */}
+                    {/* One-Line Summary */}
                     <label className="field">
                       <span className="label">One-line summary</span>
                       <input
@@ -1359,6 +1539,7 @@ function App() {
                       />
                     </label>
 
+                    {/* Description */}
                     <label className="field">
                       <span className="label">Description</span>
                       <textarea
@@ -1371,6 +1552,71 @@ function App() {
                       />
                     </label>
 
+                    {/* Benefits */}
+                    <div className="field">
+                      <span className="label">Benefits</span>
+                      <div className="listBuilderRow">
+                        <input
+                          value={benefitsInput}
+                          onChange={(e) => setBenefitsInput(e.target.value)}
+                          placeholder="e.g. 1. Competitive interest rates"
+                        />
+                        <button
+                          className="btn small"
+                          type="button"
+                          onClick={() => {
+                            const next = benefitsInput.trim()
+                            if (!next) return
+                            setProductDraft((p) => ({
+                              ...p,
+                              benefits: normalizeList([...(p.benefits || []), next]),
+                            }))
+                            setBenefitsInput('')
+                          }}
+                        >
+                          Add
+                        </button>
+                        {
+                          normalizeList(productDraft.benefits).length > 0 && (
+                            <button
+                              className="btn small ghost"
+                              type="button"
+                              onClick={() => setProductDraft((p) => ({ ...p, benefits: [] }))}
+                              disabled={normalizeList(productDraft.benefits).length === 0}
+                            >
+                              Clear all
+                            </button>
+                          )
+                        }
+                      </div>
+                      {normalizeList(productDraft.benefits).length ? (
+                        <div className="listItems">
+                          {normalizeList(productDraft.benefits).map((item) => (
+                            <div key={item} className="listItem">
+                              <span className="listText">{item}</span>
+                              <button
+                                className="btn small ghost"
+                                type="button"
+                                onClick={() =>
+                                  setProductDraft((p) => ({
+                                    ...p,
+                                    benefits: normalizeList(p.benefits).filter((x) => x !== item),
+                                  }))
+                                }
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="hint">
+                          {/* Number the steps (e.g. 1. Visit branch, 2. Submit documents...) */}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Requirements */}
                     <div className="field">
                       <span className="label">Requirements</span>
                       <div className="listBuilderRow">
@@ -1436,6 +1682,7 @@ function App() {
                       )}
                     </div>
 
+                    {/* Eligibility */}
                     <div className="field">
                       <span className="label">Eligibility</span>
                       <div className="listBuilderRow">
@@ -1501,6 +1748,73 @@ function App() {
                       )}
                     </div>
 
+                    {/* Terms & Conditions */}
+                    <div className="field">
+                      <span className="label">Terms & Conditions</span>
+                      <div className="listBuilderRow">
+                        <input
+                          value={tsNcsInput}
+                          onChange={(e) => setTsNcsInput(e.target.value)}
+                          placeholder="e.g. No prepayment penalties"
+                        />
+                        <button
+                          className="btn small"
+                          type="button"
+                          onClick={() => {
+                            const next = tsNcsInput.trim()
+                            if (!next) return
+                            setProductDraft((p) => ({
+                              ...p,
+                              termsAndConditions: normalizeList([...(p.termsAndConditions || []), next]),
+                            }))
+                            setTsNcsInput('')
+                          }}
+                        >
+                          Add
+                        </button>
+                        {
+                          normalizeList(productDraft.termsAndConditions).length > 0 && (
+                            <button
+                              className="btn small ghost"
+                              type="button"
+                              onClick={() => setProductDraft((p) => ({ ...p, termsAndConditions: [] }))}
+                              disabled={normalizeList(productDraft.termsAndConditions).length === 0}
+                            >
+                              Clear all
+                            </button>
+                          )
+                        }
+                      </div>
+                      {normalizeList(productDraft.termsAndConditions).length ? (
+                        <div className="listItems">
+                          {normalizeList(productDraft.termsAndConditions).map((item) => (
+                            <div key={item} className="listItem">
+                              <span className="listText">{item}</span>
+                              <button
+                                className="btn small ghost"
+                                type="button"
+                                onClick={() =>
+                                  setProductDraft((p) => ({
+                                    ...p,
+                                    termsAndConditions: normalizeList(p.termsAndConditions).filter((x) => x !== item),
+                                  }))
+                                }
+                                aria-label={`Remove eligibility: ${item}`}
+                                title="Remove"
+                              >
+                                ✕
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="hint">
+                          Add who qualifies (membership status, age bracket, employment type, etc.).
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Fees and Charges */}
                     <div className="field">
                       <span className="label">Fees & charges</span>
                       <textarea
@@ -1682,6 +1996,26 @@ function App() {
                     {/* SAVINGS */}
                     {productDraft.category === 'Savings' && (
                       <>
+                        <label className="field">
+                          <span className="label">Account Type</span>
+                          <div className="notice">
+                            <div className="radio-group">
+                              {['Fixed Account', 'Variable Account'].map((type) => (
+                                <label key={type} className="radio-option">
+                                  <input
+                                    type="radio"
+                                    name="accountType"
+                                    value={type}
+                                    checked={productDraft.accountType === type}
+                                    onChange={(e) => setProductDraft((p) => ({ ...p, accountType: e.target.value }))}
+                                  />
+                                  {type}
+                                </label>
+                              ))}
+                            </div>
+                          </div>
+                        </label>
+
                         <div className="grid two">
                           <label className="field">
                             <span className="label">Interest rate (APR %)</span>
@@ -1693,6 +2027,7 @@ function App() {
                               inputMode="decimal"
                             />
                           </label>
+
                           <label className="field">
                             <span className="label">Minimum balance</span>
                             <input
@@ -1706,16 +2041,63 @@ function App() {
                         </div>
 
                         <label className="field">
-                          <span className="label">Compounding frequency</span>
-                          <select
-                            value={productDraft.compoundingFrequency}
-                            onChange={(e) => setProductDraft((p) => ({ ...p, compoundingFrequency: e.target.value }))}
-                          >
-                            <option>Daily</option>
-                            <option>Weekly</option>
-                            <option>Monthly</option>
-                            <option>Annually</option>
-                          </select>
+                          <span className="label">How is Interest Rate (APR) calculated</span>
+                          <div className="notice">
+                            <div className="radio-group">
+                              {['Monthly', 'Quarterly', 'Annually'].map((type) => (
+                                <label key={type} className="radio-option">
+                                  <input
+                                    type="radio"
+                                    name="interestRateFrequency"
+                                    value={type}
+                                    checked={productDraft.interestRateFrequency === type}
+                                    onChange={(e) => setProductDraft((p) => ({ ...p, interestRateFrequency: e.target.value }))}
+                                  />
+                                  {type}
+                                </label>
+                              ))}
+                            </div>
+                          </div>
+                        </label>
+
+                        <div className="grid two">
+                          <label className="field">
+                            <span className="label">Compounding frequency</span>
+                            <select
+                              value={productDraft.compoundingFrequency}
+                              onChange={(e) => setProductDraft((p) => ({ ...p, compoundingFrequency: e.target.value }))}
+                            >
+                              <option>Daily</option>
+                              <option>Weekly</option>
+                              <option>Bi-Weekly</option>
+                              <option>Monthly</option>
+                              <option>Bi-Monthly</option>
+                              <option>Quarterly</option>
+                              <option>Semi-Annual</option>
+                              <option>Annually</option>
+                            </select>
+                          </label>
+                          <label className="field">
+                            <span className="label">Withdrawal Rules</span>
+                            <select
+                              value={productDraft.withdrawalRules}
+                              onChange={(e) => setProductDraft((p) => ({ ...p, withdrawalRules: e.target.value }))}
+                            >
+                              <option>AnyTime</option>
+                              <option>Restricted</option>
+                              <option>Notice Period</option>
+                            </select>
+                          </label>
+                        </div>
+
+                        <label className="field">
+                          <span className="label">Risk Disclaimer</span>
+                          <input
+                            value={productDraft.riskDisclaimer}
+                            type='text'
+                            onChange={(e) => setProductDraft((p) => ({ ...p, riskDisclaimer: e.target.value }))}
+                            placeholder="e.g. returns not guaranteed if account is variable"
+                          />
                         </label>
                       </>
                     )}
@@ -1833,26 +2215,58 @@ function App() {
                           <label className="field">
                             <span className="label">Expected returns (% p.a.)</span>
                             <input
-                              value={productDraft.expectedReturns}
                               type='number'
+                              value={productDraft.expectedReturns}
                               onChange={(e) => setProductDraft((p) => ({ ...p, expectedReturns: e.target.value }))}
-                              placeholder="e.g. 12"
+                              placeholder="e.g. 12.5"
                               inputMode="decimal"
                             />
                           </label>
                         </div>
 
                         <label className="field">
-                          <span className="label">Risk level</span>
-                          <select
-                            value={productDraft.riskLevel}
-                            onChange={(e) => setProductDraft((p) => ({ ...p, riskLevel: e.target.value }))}
-                          >
-                            <option>Low</option>
-                            <option>Medium</option>
-                            <option>High</option>
-                          </select>
+                          <span className="label">How are the Expected Returns calculated</span>
+                          <div className="notice">
+                            <div className="radio-group">
+                              {['Annually', 'Semi-Annually', 'Quarterly', 'Monthly'].map((type) => (
+                                <label key={type} className="radio-option">
+                                  <input
+                                    type="radio"
+                                    name="expectedReturnsFrequency"
+                                    value={type}
+                                    checked={productDraft.expectedReturnsFrequency === type}
+                                    onChange={(e) => setProductDraft((p) => ({ ...p, expectedReturnsFrequency: e.target.value }))}
+                                  />
+                                  {type}
+                                </label>
+                              ))}
+                            </div>
+                          </div>
                         </label>
+
+                        <div className="grid two">
+                          <label className="field">
+                            <span className="label">Risk level</span>
+                            <select
+                              value={productDraft.riskLevel}
+                              onChange={(e) => setProductDraft((p) => ({ ...p, riskLevel: e.target.value }))}
+                            >
+                              <option>Low</option>
+                              <option>Medium</option>
+                              <option>High</option>
+                            </select>
+                          </label>
+
+                          <label className="field">
+                            <span className="label">Risk Disclaimer</span>
+                            <input
+                              value={productDraft.riskDisclaimer}
+                              type='text'
+                              onChange={(e) => setProductDraft((p) => ({ ...p, riskDisclaimer: e.target.value }))}
+                              placeholder="e.g. Investments are subject to market risks"
+                            />
+                          </label>
+                        </div>
 
                         <label className="field">
                           <span className="label">Investment strategy</span>
@@ -1942,6 +2356,18 @@ function App() {
                                 <button className="btn small" type="button" onClick={() => editProduct(p)}>
                                   Edit
                                 </button>
+
+                                {mode === 'registered' && (
+                                  <button
+                                    className="btn small"
+                                    style={{ background: 'var(--brand)', color: '#fff' }}
+                                    type="button"
+                                    onClick={() => startPromote(p)}
+                                  >
+                                    Promote
+                                  </button>
+                                )}
+
                                 <button
                                   className="btn small danger"
                                   type="button"
@@ -1956,18 +2382,245 @@ function App() {
 
                         <div className="actions">
                           <button className="btn" type="button" onClick={() => setView('edit')}>
-                            Add another product
+                            Add More Products
                           </button>
                           <button
                             className="btn primary"
                             type="button"
                             onClick={() => setView('submitted')}
                           >
-                            Continue to submit
+                            Continue to Submit
                           </button>
                         </div>
                       </>
                     )}
+                  </>
+                ) : view === 'promote' ? (
+                  /* ==================== NEW PROMOTE VIEW (category-aware) ==================== */
+                  <>
+                    <div className="notice">
+                      <div className="noticeTitle">
+                        {`Promote ${products.find((p) => p.id === promotingId)?.category || 'Product'}`}
+                      </div>
+                      <div className="noticeText">
+                        Create promotional content for{' '}
+                        <strong>{products.find((p) => p.id === promotingId)?.name}</strong>
+                        <br />
+                        <span style={{ fontSize: '0.9rem', color: 'var(--muted)' }}>
+                          Category: {products.find((p) => p.id === promotingId)?.category}
+                        </span>
+                      </div>
+                    </div>
+
+                    <label className="field">
+                      <span className="label">Promotional Headline</span>
+                      <input
+                        value={promotionDraft.headline}
+                        onChange={(e) => setPromotionDraft((pd) => ({ ...pd, headline: e.target.value }))}
+                        placeholder="e.g. Get 0% Interest on Your First Loan!"
+                      />
+                    </label>
+
+                    <label className="field">
+                      <span className="label">Promotional Description</span>
+                      <textarea
+                        value={promotionDraft.promoDescription}
+                        onChange={(e) => setPromotionDraft((pd) => ({ ...pd, promoDescription: e.target.value }))}
+                        rows={4}
+                        placeholder="Longer marketing text that will appear in the Business Link app..."
+                      />
+                    </label>
+
+                    {/* Highlights (reusable list builder) */}
+                    <div className="field">
+                      <span className="label">Key Highlights / Selling Points</span>
+                      <div className="listBuilderRow">
+                        <input
+                          value={promoHighlightsInput}
+                          onChange={(e) => setPromoHighlightsInput(e.target.value)}
+                          placeholder="e.g. Instant approval in 5 minutes"
+                        />
+                        <button className="btn small" type="button" onClick={() => {
+                          const next = promoHighlightsInput.trim()
+                          if (!next) return
+                          setPromotionDraft((pd) => ({
+                            ...pd,
+                            highlights: [...(pd.highlights || []), next],
+                          }))
+                          setPromoHighlightsInput('')
+                        }}>
+                          Add
+                        </button>
+                        {promotionDraft.highlights.length > 0 && (
+                          <button className="btn small ghost" type="button"
+                            onClick={() => setPromotionDraft((pd) => ({ ...pd, highlights: [] }))}>
+                            Clear all
+                          </button>
+                        )}
+                      </div>
+
+                      {promotionDraft.highlights.length > 0 && (
+                        <div className="listItems">
+                          {promotionDraft.highlights.map((item, i) => (
+                            <div key={i} className="listItem">
+                              <span className="listText">{item}</span>
+                              <button className="btn small ghost" type="button"
+                                onClick={() => setPromotionDraft((pd) => ({
+                                  ...pd,
+                                  highlights: pd.highlights.filter((_, idx) => idx !== i),
+                                }))}>
+                                ✕
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    <div className="grid two">
+                      <label className="field">
+                        <span className="label">Call-to-Action</span>
+                        <input
+                          value={promotionDraft.ctaText}
+                          onChange={(e) => setPromotionDraft((pd) => ({ ...pd, ctaText: e.target.value }))}
+                          placeholder="Apply Now"
+                        />
+                      </label>
+
+                      <label className="field">
+                        <span className="label">Offer valid until</span>
+                        <input
+                          type="date"
+                          value={promotionDraft.offerValidUntil}
+                          onChange={(e) => setPromotionDraft((pd) => ({ ...pd, offerValidUntil: e.target.value }))}
+                        />
+                      </label>
+                    </div>
+
+                    {/* === CATEGORY-SPECIFIC PROMOTION FIELDS === */}
+                    {(() => {
+                      const prod = products.find((p) => p.id === promotingId)
+                      const cat = prod?.category || ''
+                      // if (cat === 'Loans') {
+                      return (
+                        <div className="promoteCategoryNotice">
+                          <div className="noticeTitle">
+                            {
+                              cat === 'Loans' ? 'Loans-specific promotion' :
+                                cat === 'Savings' ? 'Savings-specific promotion' :
+                                  cat === 'Insurance' ? 'Insurance-specific promotion' : 'Investments-specific promotion'
+                            }
+                          </div>
+
+                          <div className="field">
+                            <span className="label">Add Specialties</span>
+                            <div className="listBuilderRow">
+                              <input
+                                value={promoSpecialtyInput}
+                                onChange={(e) => setPromoSpecialtyInput(e.target.value)}
+                                placeholder="e.g. First come get free / 0% ..."
+                              />
+                              <button className="btn small" type="button" onClick={() => {
+                                const next = promoSpecialtyInput.trim()
+                                if (!next) return
+                                setPromotionDraft((pd) => ({
+                                  ...pd,
+                                  specialties: [...(pd.specialties || []), next],
+                                }))
+                                setPromoSpecialtyInput('')
+                              }}>
+                                Add
+                              </button>
+
+                              {promotionDraft.specialties.length > 0 && (
+                                <button className="btn small ghost" type="button"
+                                  onClick={() => setPromotionDraft((pd) => ({ ...pd, specialties: [] }))}>
+                                  Clear all
+                                </button>
+                              )}
+                            </div>
+
+                            {promotionDraft.specialties.length > 0 && (
+                              <div className="listItems">
+                                {promotionDraft.specialties.map((item, i) => (
+                                  <div key={i} className="listItem">
+                                    <span className="listText">{item}</span>
+                                    <button className="btn small ghost" type="button"
+                                      onClick={() => setPromotionDraft((pd) => ({
+                                        ...pd,
+                                        specialties: pd.specialties.filter((_, idx) => idx !== i),
+                                      }))}>
+                                      ✕
+                                    </button>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )
+
+                      // }
+                      // if (cat === 'Savings') {
+                      //   return (
+                      //     <div className="promoteCategoryNotice">
+                      //       <div className="noticeTitle">Savings-specific promotion</div>
+                      //       <label className="field">
+                      //         <span className="label">Bonus Interest Boost</span>
+                      //         <input
+                      //           type="text"
+                      //           value={promotionDraft.bonusInterest}
+                      //           onChange={(e) => setPromotionDraft((pd) => ({ ...pd, bonusInterest: e.target.value }))}
+                      //           placeholder="e.g. +2% for the first 6 months"
+                      //         />
+                      //       </label>
+                      //     </div>
+                      //   )
+                      // }
+                      // if (cat === 'Insurance') {
+                      //   return (
+                      //     <div className="promoteCategoryNotice">
+                      //       <div className="noticeTitle">Insurance-specific promotion</div>
+                      //       <label className="field">
+                      //         <span className="label">Add Specialties</span>
+                      //         <input
+                      //           type="text"
+                      //           value={promotionDraft.bonusInterest}
+                      //           onChange={(e) => setPromotionDraft((pd) => ({ ...pd, bonusInterest: e.target.value }))}
+                      //           placeholder="e.g. +2% for the first 6 months"
+                      //         />
+                      //       </label>
+                      //     </div>
+                      //   )
+                      // }
+                      // if (cat === 'Investments') {
+                      //   return (
+                      //     <div className="promoteCategoryNotice">
+                      //       <div className="noticeTitle">Investments-specific promotion</div>
+                      //       <div className="noticeText">Highlight guaranteed returns or low-risk entry.</div>
+                      //     </div>
+                      //   )
+                      // }
+                      // return null
+                    })()}
+
+                    <div className="actions">
+                      <button className="btn" type="button"
+                        onClick={() => { setView('review'); setPromotingId(null) }}>
+                        Cancel
+                      </button>
+                      <button className="btn primary" type="button" onClick={savePromotion} disabled={isSavingPromotion}>
+                        {isSavingPromotion ? (
+                          <ClipLoader
+                            color={'#AAA'}
+                            loading={isSavingPromotion}
+                            size={10}
+                            aria-label="Loading Spinner"
+                            data-testid="loader"
+                          />
+                        ) : 'Save Promotion Content'}
+                      </button>
+                    </div>
                   </>
                 ) : (
                   <>
