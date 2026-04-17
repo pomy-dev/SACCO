@@ -4,7 +4,7 @@ import './App.css'
 import CompanyLogo from './assets/Img/logo.jpg'
 
 // const API_BASE_URL = 'https://phone-bool-eswatini.onrender.com'
-const API_BASE_URL = 'http://10.150.51.52:5000'
+const API_BASE_URL = 'http://10.150.51.179:5000'
 
 const STORAGE_KEYS = {
   theme: 'sacco_portal_theme',
@@ -101,6 +101,7 @@ function App() {
   })
 
   const [now, setNow] = useState(() => Date.now())
+
   useEffect(() => {
     const id = window.setInterval(() => setNow(Date.now()), 1000)
     return () => window.clearInterval(id)
@@ -122,6 +123,7 @@ function App() {
     localStorage.getItem(STORAGE_KEYS.mode) === 'registered' ? 'registered' : 'new',
   )
   const [promotingId, setPromotingId] = useState(null)
+
   const [promotionDraft, setPromotionDraft] = useState({
     headline: '',
     promoDescription: '',
@@ -130,6 +132,7 @@ function App() {
     offerValidUntil: '',
     specialties: '',
   })
+
   const [promoHighlightsInput, setPromoHighlightsInput] = useState('')
   const [promoSpecialtyInput, setPromoSpecialtyInput] = useState('')
 
@@ -684,7 +687,9 @@ function App() {
       summary: '',
       description: '',
       category: 'Savings',
+      accountType: '',
       interestRateApr: '',
+      interestRateFrequency: '',
       minDurationMonths: '',
       maxDurationMonths: '',
       requirements: [],
@@ -696,16 +701,22 @@ function App() {
       collateral: '',
       processingTime: '',
       applicationSteps: [],
+      benefits: [],
+      termsAndConditions: [],
       monthlyPremium: '',
       coverageAmount: '',
       policyType: 'Life',
       coverageDetails: [],
       minInvestment: '',
       expectedReturns: '',
+      expectedReturnsFrequency: '',
       riskLevel: 'Medium',
+      riskDisclaimer: '',
       investmentStrategy: '',
+      withdrawalRules: '',
       minBalance: '',
       compoundingFrequency: 'Monthly',
+      likes: 0, reviews: []
     })
 
     setMode('new')
@@ -751,12 +762,14 @@ function App() {
       id: editingId || newId,
       name,
       category: productDraft.category,
+      accountType: productDraft.accountType,
       summary: productDraft.summary.trim(),
       description: productDraft.description.trim(),
       interestRateApr:
         productDraft.interestRateApr === ''
           ? ''
           : clampNumber(Number(productDraft.interestRateApr), { min: 0, max: 200 }),
+      interestRateFrequency: productDraft.interestRateFrequency,
       minDurationMonths:
         productDraft.minDurationMonths === ''
           ? ''
@@ -777,6 +790,8 @@ function App() {
       // NEW fields
       processingTime: productDraft.processingTime.trim(),
       applicationSteps: normalizeList(productDraft.applicationSteps),
+      benefits: normalizeList(productDraft.benefits),
+      termsAndConditions: normalizeList(productDraft.termsAndConditions),
       monthlyPremium:
         productDraft.monthlyPremium === ''
           ? ''
@@ -795,6 +810,7 @@ function App() {
         productDraft.expectedReturns === ''
           ? ''
           : clampNumber(Number(productDraft.expectedReturns), { min: 0, max: 1000 }),
+      expectedReturnsFrequency: productDraft.expectedReturnsFrequency,
       riskLevel: productDraft.riskLevel,
       investmentStrategy: productDraft.investmentStrategy.trim(),
       minBalance:
@@ -802,6 +818,10 @@ function App() {
           ? ''
           : clampNumber(Number(productDraft.minBalance), { min: 0 }),
       compoundingFrequency: productDraft.compoundingFrequency,
+      withdrawalRules: productDraft.withdrawalRules,
+      riskDisclaimer: productDraft.riskDisclaimer,
+      likes: productDraft.likes,
+      reviews: productDraft.reviews,
       updatedAt: Date.now(),
     }
 
@@ -874,9 +894,11 @@ function App() {
     setProductDraft({
       name: p.name || '',
       category: p.category || 'Savings',
+      accountType: p.accountType,
       summary: p.summary || '',
       description: p.description || '',
       interestRateApr: p.interestRateApr === '' ? '' : String(p.interestRateApr ?? ''),
+      interestRateFrequency: p.interestRateFrequency || '',
       minDurationMonths: p.minDurationMonths === '' ? '' : String(p.minDurationMonths ?? ''),
       maxDurationMonths: p.maxDurationMonths === '' ? '' : String(p.maxDurationMonths ?? ''),
       requirements: normalizeList(p.requirements),
@@ -889,16 +911,20 @@ function App() {
       // NEW fields
       processingTime: p.processingTime || '',
       applicationSteps: normalizeList(p.applicationSteps),
+      benefits: normalizeList(p.benefits),
       monthlyPremium: p.monthlyPremium === '' ? '' : String(p.monthlyPremium ?? ''),
       coverageAmount: p.coverageAmount === '' ? '' : String(p.coverageAmount ?? ''),
       policyType: p.policyType || 'Life',
       coverageDetails: normalizeList(p.coverageDetails),
       minInvestment: p.minInvestment === '' ? '' : String(p.minInvestment ?? ''),
       expectedReturns: p.expectedReturns === '' ? '' : String(p.expectedReturns ?? ''),
+      expectedReturnsFrequency: p.expectedReturnsFrequency || '',
       riskLevel: p.riskLevel || 'Medium',
       investmentStrategy: p.investmentStrategy || '',
       minBalance: p.minBalance === '' ? '' : String(p.minBalance ?? ''),
       compoundingFrequency: p.compoundingFrequency || 'Monthly',
+      withdrawalRules: p.withdrawalRules || '',
+      riskDisclaimer: p.riskDisclaimer || ''
     })
     setRequirementsInput('')
     setEligibilityInput('')
@@ -921,9 +947,11 @@ function App() {
     try {
       setIsSubmitting(true)
       const payload = {
-        SaccoEntity: draft?.company || {},
+        SaccoEntity: draft?.company || draft || {},
         SaccoEntityProducts: draft?.products || [],
       };
+
+      console.log(payload.SaccoEntityProducts[0])
 
       const response = await fetch(`${API_BASE_URL}/api/submit-sacco`, {
         method: 'POST',
@@ -943,12 +971,14 @@ function App() {
       setDraft((d) => ({ ...(d || {}), submittedAt: ts, updatedAt: ts }))
       setView('submitted')
 
-      alert(`Success! ${result.message}\n\nYou can now view your products in the Business Link app.`);
+      alert(`Success! ${result.message}\n\nData saved successfully.`);
     } catch (err) {
       console.error(err);
       setOtpError(`Submission failed: ${err.message}`);
     } finally {
       setIsSubmitting(false)
+      // set timeout
+      setTimeout(() => { setView('review') }, 7000)
     }
   }
 
@@ -1507,7 +1537,7 @@ function App() {
                       {mode === 'registered'
                         ? 'Your company is already registered. Edit or promote existing products, or add more.'
                         : `Add your financial products, then review everything before submitting. Access
-                           stays open for <strong>18 hours</strong> after verification.`}
+                           stays open for 18 hours after verification.`}
                     </p>
                   </div>
                   {(draft.company?.logoFile?.url || draft.logoFile?.url) ? (
@@ -2363,6 +2393,7 @@ function App() {
                               summary: '',
                               description: '',
                               interestRateApr: '',
+                              interestRateFrequency: '',
                               minDurationMonths: '',
                               maxDurationMonths: '',
                               requirements: [],
@@ -2375,6 +2406,9 @@ function App() {
                               likes: 0,
                               processingTime: '',
                               accountType: 'Fixed Account',
+                              applicationSteps: [],
+                              benefits: [],
+                              termsAndConditions: [],
                               interestRateFrequency: 'Monthly',
                               compoundingFrequency: 'Monthly',
                               withdrawalRules: 'AnyTime',
@@ -2385,6 +2419,7 @@ function App() {
                               coverageDetails: [],
                               minInvestment: '',
                               expectedReturns: '',
+                              minBalance: '',
                               expectedReturnsFrequency: 'Annually',
                               riskLevel: 'Medium',
                               investmentStrategy: '',
@@ -2678,29 +2713,37 @@ function App() {
                         <div className="panelTitle">Company</div>
                         <div className="kv">
                           <div className="k">Name</div>
-                          <div className="v">{draft?.company?.companyName || '—'}</div>
+                          <div className="v">{draft?.company?.companyName || headerCompany || '—'}</div>
                           <div className="k">Email</div>
-                          <div className="v">{draft?.company?.email || '—'}</div>
+                          <div className="v">{draft?.company?.email || headerEmail || '—'}</div>
                           <div className="k">Coordinates</div>
                           <div className="v">
-                            {Array.isArray(draft?.company?.branches) && draft.company.branches.length
-                              ? draft.company.branches.map((b, i) => (
+                            {Array.isArray(draft?.company?.branches || draft?.branches) && (draft?.company?.branches.length || draft?.branches?.length)
+                              ? (draft.company?.branches.map((b, i) => (
                                 <div key={i}>
                                   {b?.latitude !== '' && b?.longitude !== ''
                                     ? `${b.latitude}, ${b.longitude}`
                                     : '—'}
                                 </div>
-                              ))
+                              )) || draft?.branches.map((b, i) => (
+                                <div key={i}>
+                                  {b?.latitude !== '' && b?.longitude !== ''
+                                    ? `${b.latitude}, ${b.longitude}`
+                                    : '—'}
+                                </div>
+                              )))
                               : draft?.company?.latitude !== '' && draft?.company?.longitude !== ''
-                                ? `${draft.company.latitude}, ${draft.company.longitude}`
+                                ? `${draft.company?.latitude}, ${draft.company?.longitude}`
                                 : '—'}
                           </div>
                           <div className="k">Directions</div>
                           <div className="v">
-                            {Array.isArray(draft?.company?.branches) && draft.company.branches.length
-                              ? draft.company.branches.map((b, i) => (
+                            {Array.isArray(draft?.company?.branches || draft?.branches) && (draft?.company?.branches.length || draft?.branches.length)
+                              ? (draft.company?.branches.map((b, i) => (
                                 <div key={i}>{b?.directionsText || '—'}</div>
-                              ))
+                              )) || draft?.branches.map((b, i) => (
+                                <div key={i}>{b?.directionsText || '—'}</div>
+                              )))
                               : draft?.company?.directionsText || '—'}
                           </div>
                         </div>
