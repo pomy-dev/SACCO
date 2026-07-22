@@ -4,7 +4,7 @@ import './App.css'
 import CompanyLogo from './assets/Img/logo.jpg'
 
 // const API_BASE_URL = 'https://phone-bool-eswatini.onrender.com'
-const API_BASE_URL = 'http://10.150.51.113:5000'
+const API_BASE_URL = 'http://10.150.51.170:5000'
 
 const STORAGE_KEYS = {
   theme: 'sacco_portal_theme',
@@ -1998,7 +1998,7 @@ function App() {
                             <span className="label">Interest rate (APR %)</span>
                             <input
                               value={productDraft.interestRateApr}
-                              type='number'
+                              // type='number'
                               onChange={(e) => setProductDraft((p) => ({ ...p, interestRateApr: e.target.value }))}
                               placeholder="e.g. 18"
                               inputMode="decimal"
@@ -2008,7 +2008,7 @@ function App() {
                             <span className="label">Min duration (months)</span>
                             <input
                               value={productDraft.minDurationMonths}
-                              type='number'
+                              // type='number'
                               onChange={(e) => setProductDraft((p) => ({ ...p, minDurationMonths: e.target.value }))}
                               placeholder="e.g. 1"
                               inputMode="numeric"
@@ -2018,7 +2018,7 @@ function App() {
                             <span className="label">Max duration (months)</span>
                             <input
                               value={productDraft.maxDurationMonths}
-                              type='number'
+                              // type='number'
                               onChange={(e) => setProductDraft((p) => ({ ...p, maxDurationMonths: e.target.value }))}
                               placeholder="e.g. 36"
                               inputMode="numeric"
@@ -2031,7 +2031,7 @@ function App() {
                             <span className="label">Min amount</span>
                             <input
                               value={productDraft.minAmount}
-                              type='number'
+                              // type='number'
                               onChange={(e) => setProductDraft((p) => ({ ...p, minAmount: e.target.value }))}
                               placeholder="e.g. 500"
                               inputMode="decimal"
@@ -2041,7 +2041,7 @@ function App() {
                             <span className="label">Max amount</span>
                             <input
                               value={productDraft.maxAmount}
-                              type='number'
+                              // type='number'
                               onChange={(e) => setProductDraft((p) => ({ ...p, maxAmount: e.target.value }))}
                               placeholder="e.g. 50000"
                               inputMode="decimal"
@@ -2115,7 +2115,7 @@ function App() {
                             <span className="label">Interest rate (APR %)</span>
                             <input
                               value={productDraft.interestRateApr}
-                              type='number'
+                              // type='number'
                               onChange={(e) => setProductDraft((p) => ({ ...p, interestRateApr: e.target.value }))}
                               placeholder="e.g. 5.5"
                               inputMode="decimal"
@@ -2126,7 +2126,7 @@ function App() {
                             <span className="label">Minimum balance</span>
                             <input
                               value={productDraft.minBalance}
-                              type='number'
+                              // type='number'
                               onChange={(e) => setProductDraft((p) => ({ ...p, minBalance: e.target.value }))}
                               placeholder="e.g. 100"
                               inputMode="decimal"
@@ -2138,7 +2138,7 @@ function App() {
                           <span className="label">How is Interest Rate (APR) calculated</span>
                           <div className="notice">
                             <div className="radio-group">
-                              {['Monthly', 'Quarterly', 'Annually'].map((type) => (
+                              {['Monthly', 'Quarterly', 'Semi-Annually', 'Annually'].map((type) => (
                                 <label key={type} className="radio-option">
                                   <input
                                     type="radio"
@@ -2204,7 +2204,7 @@ function App() {
                             <span className="label">Monthly premium</span>
                             <input
                               value={productDraft.monthlyPremium}
-                              type='number'
+                              // type='number'
                               onChange={(e) => setProductDraft((p) => ({ ...p, monthlyPremium: e.target.value }))}
                               placeholder="e.g. 45"
                               inputMode="decimal"
@@ -2214,7 +2214,7 @@ function App() {
                             <span className="label">Coverage amount</span>
                             <input
                               value={productDraft.coverageAmount}
-                              type='number'
+                              // type='number'
                               onChange={(e) => setProductDraft((p) => ({ ...p, coverageAmount: e.target.value }))}
                               placeholder="e.g. 100000"
                               inputMode="decimal"
@@ -2300,7 +2300,7 @@ function App() {
                             <span className="label">Minimum investment</span>
                             <input
                               value={productDraft.minInvestment}
-                              type='number'
+                              // type='number'
                               onChange={(e) => setProductDraft((p) => ({ ...p, minInvestment: e.target.value }))}
                               placeholder="e.g. 5000"
                               inputMode="decimal"
@@ -2309,7 +2309,7 @@ function App() {
                           <label className="field">
                             <span className="label">Expected returns (% p.a.)</span>
                             <input
-                              type='number'
+                              // type='number'
                               value={productDraft.expectedReturns}
                               onChange={(e) => setProductDraft((p) => ({ ...p, expectedReturns: e.target.value }))}
                               placeholder="e.g. 12.5"
